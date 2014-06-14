@@ -18,3 +18,4 @@
 * Edit the deleting script ( should be easy )
 * Delete unwanted items in destination folder
 * Implement theRenamer or couchpotato/sickbeard postprocess scripts
+* Implement notifications
