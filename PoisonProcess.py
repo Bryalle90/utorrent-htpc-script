@@ -13,12 +13,7 @@ class PoisonProcess(object):
 		output_dir = config.get("General", "outputDirectory")
 		append_label = config.getboolean("General", "appendLabel")
 		append_torName = config.getboolean("General", "appendTorrentName")
-		overwriteFiles = config.getboolean("General", "overwrite")
 		deleteOnFinish = config.getboolean("General", "delete")
-		
-		extractor = config.get("Extract", "extractor")
-		extractor_path = config.get("Extract", "path")
-		queryPassword = config.getboolean("Extract", "askOnPW")
 		
 		useRenamer = config.getboolean("Renamer", "useTheRenamer")
 		if useRenamer:
@@ -156,7 +151,7 @@ class PoisonProcess(object):
 		else:
 			print file_name + ' already exists in destination, skipping'
 
-	def copy_tree(self, source, dest, keep_ext ):	# copies a folder structure to destination and only files with the specified extensions
+	def copy_tree(self, source, dest, keep_ext):	# copies a folder structure to destination and only files with the specified extensions
 		for dirName, subdirList, fileList in os.walk(source):
 			for fname in fileList:
 				if fname.endswith(keep_ext):
