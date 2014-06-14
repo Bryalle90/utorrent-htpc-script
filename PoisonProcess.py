@@ -23,17 +23,17 @@ class PoisonProcess(object):
 		if useRenamer:
 			renamer_path = config.get("Renamer", "renamerPath")
 		
-		webui_port = config.get("Client", "port")
-		webui_URL = 'http://localhost:' + str(webui_port) + '/gui/'
-		webui_user = config.get("Client", "username")
-		webui_pass = config.get("Client", "password")
-		
 		email_notify = config.getboolean("Notifications", "email")
 		email_server = config.get("Notifications", "SMTPServer")
 		email_port = config.get("Notifications", "SMTPPort")
 		email_user = config.get("Notifications", "username")
 		email_pass = config.get("Notifications", "password")
 		email_to = config.get("Notifications", "emailTo")
+
+		webui_port = config.get("Client", "port")
+		webui_URL = 'http://localhost:' + str(webui_port) + '/gui/'
+		webui_user = config.get("Client", "username")
+		webui_pass = config.get("Client", "password")
 		
 		#connect to utorrent and get info for torrent using torrent hash
 		uTorrent = TorClient.TorrentClient()
@@ -44,7 +44,11 @@ class PoisonProcess(object):
 		torrent_info = uTorrent.get_info(torrent)
 		
 		torrent_state = torrent_info['state'].split(' ')
-		torrent_state = torrent_state[1] if torrent_state[0] == '[F]' or torrent_state[0] == 'Queued' or torrent_state[0] == 'Super' and not torrent_state[1] == '' else torrent_state[0]
+		torrent_state = torrent_state[1] if torrent_state[0] == '[F]' or \
+											torrent_state[0] == 'Queued' or \
+											torrent_state[0] == 'Super' and not \
+											torrent_state[1] == '' else \
+											torrent_state[0]
 		torrent_state = torrent_state.lower()
 		
 		#
@@ -54,15 +58,20 @@ class PoisonProcess(object):
 				# get what files to keep and what to extract
 				keep_files, compressed_files, keep_structure = filter_files(torrent_info['files'], torrent_info['label'])
 
-				# create destination if it doesn't exist
-				destination = os.path.normpath(os.path.join(output_dir, torrent_info['label'] if append_label else '', torrent_info['name'] if append_torName and not keep_structure else ''))
-				self.make_directories(destination)
 			
-				
+
 				# TODO: look through rest of code starting here
 				if keep_structure:
-					copy_tree(torrent_info['folder'], )
+					destination = os.path.normpath(os.path.join(output_dir, \
+																torrent_info['label'] if append_label else '', \
+																torrent_info['name'])
+					copy_tree(os.path.normpath(torrent_info['folder']), destination)
 				else:
+					# create destination if it doesn't exist
+					destination = os.path.normpath(os.path.join(output_dir, \
+																torrent_info['label'] if append_label else '', \
+																torrent_info['name'] if append_torName else ''))
+					self.make_directories(destination)
 					# Loop through keep_files and copy the files
 					for f in keep_files:
 						file_name = os.path.split(f)[1]
@@ -159,35 +168,30 @@ class PoisonProcess(object):
 
 	def copy_tree(src, dest):
 		try:
-			shutil.copytree(src, dest)
+			shutil.copytree(sourced, destination)
 		except OSError as e:
-			# If the error was caused because the source wasn't a directory
-			if e.errno == errno.ENOTDIR:
-				shutil.copy(src, dst)
-			else:
-				print('Directory not copied. Error: %s' % e)
-					
-	def extract_file(self, source_file, destination):
-		try:
-			rar_handle = RarFile(source_file)
-			for rar_file in rar_handle.infolist():
-				sub_path = os.path.join(destination, rar_file.filename)
-				if rar_file.isdir and not os.path.exists(sub_path):
-					os.makedirs(sub_path)
-				else:
-					rar_handle.extract(condition=[rar_file.index], path=destination, withSubpath=True, overwrite=False)
-			del rar_handle
-			return True
+			print('Directory not copied. Error: %s' % e)
+						
+		def extract_file(self, source_file, destination):
+			try:
+				rar_handle = RarFile(source_file)
+				for rar_file in rar_handle.infolist():
+					sub_path = os.path.join(destination, rar_file.filename)
+					if rar_file.isdir and not os.path.exists(sub_path):
+						os.makedirs(sub_path)
+					else:
+						rar_handle.extract(condition=[rar_file.index], path=destination, withSubpath=True, overwrite=False)
+				del rar_handle
+				return True
 
-		except Exception, e:
-			logger.error(loggerHeader + "Failed to extract %s: %s %s", os.path.split(source_file)[1],
-						 e, traceback.format_exc())
-		return False
+			except Exception, e:
+				print "Failed to extract %s: %s %s", os.path.split(source_file)[1], e, traceback.format_exc()
+			return False
 
 if __name__ == "__main__":
 	this_dir = os.getcwd()
 	config = ConfigParser.ConfigParser()
-	configFilename = os.path.normpath(os.path.join(os.path.dirname(sys.argv[0]), "config.cfg"))
+	configFilename = os.path.normpath(os.path.join(this_dir, "config.cfg"))
 	config.read(configFilename)
 	
 	exit(0)
