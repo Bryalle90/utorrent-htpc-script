@@ -3,6 +3,7 @@ import sys
 import binascii
 import ConfigParser
 import libs.client.utorrent as TorClient
+from libs.unrar2 import RarFile
 
 class PoisonProcess(object):
 	def __init__(self):
@@ -58,18 +59,15 @@ class PoisonProcess(object):
 				# get what files to keep and what to extract
 				keep_files, compressed_files, keep_structure = filter_files(torrent_info['files'], torrent_info['label'])
 
-			
-
-				# TODO: look through rest of code starting here
 				if keep_structure:
-					destination = os.path.normpath(os.path.join(output_dir, \
-																torrent_info['label'] if append_label else '', \
+					destination = os.path.normpath(os.path.join(output_dir,
+																torrent_info['label'] if append_label else '',
 																torrent_info['name'])
 					copy_tree(os.path.normpath(torrent_info['folder']), destination)
 				else:
 					# create destination if it doesn't exist
-					destination = os.path.normpath(os.path.join(output_dir, \
-																torrent_info['label'] if append_label else '', \
+					destination = os.path.normpath(os.path.join(output_dir,
+																torrent_info['label'] if append_label else '',
 																torrent_info['name'] if append_torName else ''))
 					self.make_directories(destination)
 					# Loop through keep_files and copy the files
@@ -166,27 +164,27 @@ class PoisonProcess(object):
 				print "Failed to process %s: %s %s", file_name, e, traceback.format_exc()
 			return False
 
-	def copy_tree(src, dest):
+	def copy_tree(self, src, dest):	# copy full file structure and files
 		try:
 			shutil.copytree(sourced, destination)
 		except OSError as e:
 			print('Directory not copied. Error: %s' % e)
 						
-		def extract_file(self, source_file, destination):
-			try:
-				rar_handle = RarFile(source_file)
-				for rar_file in rar_handle.infolist():
-					sub_path = os.path.join(destination, rar_file.filename)
-					if rar_file.isdir and not os.path.exists(sub_path):
-						os.makedirs(sub_path)
-					else:
-						rar_handle.extract(condition=[rar_file.index], path=destination, withSubpath=True, overwrite=False)
-				del rar_handle
-				return True
+	def extract_file(self, source_file, destination):	# extracts files from source rar to destination directory
+		try:
+			rar_handle = RarFile(source_file)
+			for rar_file in rar_handle.infolist():
+				sub_path = os.path.join(destination, rar_file.filename)
+				if rar_file.isdir and not os.path.exists(sub_path):
+					os.makedirs(sub_path)
+				else:
+					rar_handle.extract(condition=[rar_file.index], path=destination, withSubpath=True, overwrite=False)
+			del rar_handle
+			return True
 
-			except Exception, e:
-				print "Failed to extract %s: %s %s", os.path.split(source_file)[1], e, traceback.format_exc()
-			return False
+		except Exception, e:
+			print "Failed to extract %s: %s %s", os.path.split(source_file)[1], e, traceback.format_exc()
+		return False
 
 if __name__ == "__main__":
 	this_dir = os.getcwd()
@@ -205,4 +203,4 @@ if __name__ == "__main__":
 		pp = PoisonProcess()
 		pp.main(torrent_hash)
 	else:
-		print 'Script only compatible with uTorrent 3.1+'
+		print 'Script only compatible with uTorrent 3.0+'
