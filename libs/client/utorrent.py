@@ -44,12 +44,8 @@ class TorrentClient(object):
             raise 'Only compatible with uTorrent 3.0+'
 
         torrent_files = []
-        torrent_completed = False
         torrent_directory = os.path.normpath(torrent[26])
         try:
-
-            if torrent[4] == 1000:
-                torrent_completed = True
 
             files = self.conn.getfiles(torrent[0])[1]['files'][1]
 
@@ -73,12 +69,6 @@ class TorrentClient(object):
             raise
 
         return torrent_info
-
-    def start_torrent(self, torrent_hash):
-        return self.conn.start(torrent_hash)
-
-    def stop_torrent(self, torrent_hash):
-        return self.conn.stop(torrent_hash)
 
     def delete_torrent(self, torrent):
         deleted = []
