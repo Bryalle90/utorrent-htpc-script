@@ -57,13 +57,13 @@ class PoisonProcess(object):
 			if torrent_state == 'seeding' or torrent_state == 'seed':
 
 				# get what files to keep and what to extract
-				keep_files, compressed_files, keep_structure = filter_files(torrent_info['files'], torrent_info['label'])
+				keep_files, compressed_files, keep_structure, keep_ext = filter_files(torrent_info['files'], torrent_info['label'])
 
 				if keep_structure:
 					destination = os.path.normpath(os.path.join(output_dir,
 																torrent_info['label'] if append_label else '',
-																torrent_info['name'])
-					copy_tree(os.path.normpath(torrent_info['folder']), destination)
+																torrent_info['name']))
+					self.copy_tree(os.path.normpath(torrent_info['folder']), destination, keep_ext)
 				else:
 					# create destination if it doesn't exist
 					destination = os.path.normpath(os.path.join(output_dir,
@@ -73,18 +73,12 @@ class PoisonProcess(object):
 					# Loop through keep_files and copy the files
 					for f in keep_files:
 						file_name = os.path.split(f)[1]
-						if self.copy_file(f, destination):
-							print("Successfully copied: %s", file_name)
-						else:
-							print("Failed to copy: %s", file_name)
+						self.copy_file(f, destination)
 
 				# Loop through compressed_files and extract all files
 				for f in compressed_files:
 					file_name = os.path.split(f)[1]
-					if self.extract_file(f, destination):
-						print("Successfully extracted: %s", file_name)
-					else:
-						print("Failed to extract: %s", file_name)
+					self.extract_file(f, destination)
 
 	def filter_files(self, files, label):	# returns a list of files to keep in destination and a list of files to extract and whether or not to keep the folder structure
 		ignore_words = (config.get("Extensions", "ignore")).split('|')
@@ -125,7 +119,7 @@ class PoisonProcess(object):
 					if f.endswith('.rar') and is_mainRar(f):	# This will ignore rar sets where all (rar) files end with .rar
 						compressed_files.append(f)
 
-		return keep_files, compressed_files, kfs
+		return keep_files, compressed_files, kfs, keep_ext
 		
 	def is_mainRar(self, file):	# returns true if file is the main rar file in a rar set or just a single rar
 		with open(file, "rb") as file:
@@ -150,25 +144,27 @@ class PoisonProcess(object):
 					raise
 				pass
 
-	def copy_file(self, source_file, destination):	# copies a file to a destination folder
+	def copy_file(self, source_file, destination):	# copies a file to a destination folder, returns success
 		file_name = os.path.split(source_file)[1]
 		destination_file = os.path.join(destination, file_name)
 		if not os.path.isfile(destination_file):
 			try:
-				print "Copying file: %s to: %s", file_name, destination
 				shutil.copy2(source_file, destination_file)
-
-				return True
-
+				print 'Successfully copied ' + file_name + ' to destination'
 			except Exception, e:
-				print "Failed to process %s: %s %s", file_name, e, traceback.format_exc()
-			return False
+				print 'Failed to copy ' + file_name + ': ' + e + ' ' + traceback.format_exc()
+		else:
+			print file_name + ' already exists in destination, skipping'
 
-	def copy_tree(self, src, dest):	# copy full file structure and files
-		try:
-			shutil.copytree(sourced, destination)
-		except OSError as e:
-			print('Directory not copied. Error: %s' % e)
+	def copy_tree(self, source, dest, keep_ext ):	# copies a folder structure to destination and only files with the specified extensions
+		for dirName, subdirList, fileList in os.walk(source):
+			for fname in fileList:
+				if fname.endswith(keep_ext):
+					full_file = os.path.normpath(os.path.join(dirName, fname))
+					relPath = os.path.relpath(full_file, source)
+					newPath = os.path.normpath(os.path.join(dest, os.path.split(relPath)[0]))
+					self.make_directories(newPath)
+					self.copy_file(full_file, newPath)
 						
 	def extract_file(self, source_file, destination):	# extracts files from source rar to destination directory
 		try:
@@ -180,11 +176,9 @@ class PoisonProcess(object):
 				else:
 					rar_handle.extract(condition=[rar_file.index], path=destination, withSubpath=True, overwrite=False)
 			del rar_handle
-			return True
-
+			print "Successfully extracted " + os.path.split(source_file)[1] + " to destination"
 		except Exception, e:
-			print "Failed to extract %s: %s %s", os.path.split(source_file)[1], e, traceback.format_exc()
-		return False
+			print "Failed to extract " + os.path.split(source_file)[1] + ": " + e + " " + traceback.format_exc()
 
 if __name__ == "__main__":
 	this_dir = os.getcwd()
