@@ -3,6 +3,7 @@ import sys
 import binascii
 import ConfigParser
 import shutil
+import errno
 import libs.client.utorrent as TorClient
 from libs.unrar2 import RarFile
 
@@ -10,11 +11,11 @@ class PoisonProcess(object):
 	def __init__(self):
 		pass
 	
-	def main(self, torrent_hash):
+	def main(self, torrent_hash, torrent_kind, torrent_state, torrent_prev):
 		output_dir = config.get("General", "outputDirectory")
 		append_label = config.getboolean("General", "appendLabel")
 		append_torName = config.getboolean("General", "appendTorrentName")
-		deleteOnFinish = config.getboolean("General", "delete")
+		deleteOnFinish = config.getboolean("General", "remove")
 		
 		useRenamer = config.getboolean("Renamer", "useTheRenamer")
 		if useRenamer:
@@ -39,25 +40,14 @@ class PoisonProcess(object):
 			sys.exit(-1)
 		torrent = uTorrent.find_torrent(torrent_hash)
 		torrent_info = uTorrent.get_info(torrent)
-		
-		torrent_state = torrent_info['state'].split(' ')
-		torrent_state = torrent_state[1] if torrent_state[0] == '[F]' or \
-											torrent_state[0] == 'Queued' or \
-											torrent_state[0] == 'Super' and not \
-											torrent_state[1] == '' else \
-											torrent_state[0]
-		torrent_state = torrent_state.lower()
-
-		print 'Successfully connected to uTorrent'
-		print 'torrent state: ' + torrent_state + '\n'
 
 		if torrent_info:
-			if torrent_state == 'seeding' or torrent_state == 'seed':
+			if torrent_prev == 'downloading' and torrent_state == 'seeding':
 
 				# get what files to keep and what to extract
 				keep_files, compressed_files, keep_structure, keep_ext = self.filter_files(torrent_info['files'], torrent_info['label'])
 
-				if keep_structure:
+				if keep_structure and torrent_kind == 'multi':
 					destination = os.path.normpath(os.path.join(output_dir,
 																torrent_info['label'] if append_label else '',
 																torrent_info['name']))
@@ -92,6 +82,10 @@ class PoisonProcess(object):
 				print '--'
 				self.clean_dest(destination, keep_ext)
 				print '--\n'
+			# if torrent goes from seeding -> finished, remove torrent from list
+			elif torrent_prev == 'seeding' and torrent_state == 'finished' and deleteOnFinish:
+				print 'Removing torrent: ' + torrent_info['name']
+				uTorrent.delete_torrent(torrent)
 
 	def filter_files(self, files, label):	# returns a list of files to keep in destination and a list of files to extract and whether or not to keep the folder structure
 		ignore_words = (config.get("Extensions", "ignore")).split('|')
@@ -199,7 +193,7 @@ class PoisonProcess(object):
 		except Exception, e:
 			print "Failed to extract " + os.path.split(source_file)[1] + ": " + e + " " + traceback.format_exc()
 
-	def clean_dest(self, dest, keep_ext):
+	def clean_dest(self, dest, keep_ext): # cleans the destination of all files that done end with extensions in keep_ext
 		for dirName, subdirList, fileList in os.walk(dest):
 			for fname in fileList:
 				if not fname.endswith(keep_ext):
@@ -212,7 +206,36 @@ class PoisonProcess(object):
 
 if __name__ == "__main__":
 	torrent_hash = sys.argv[1]  # Hash of the torrent, %I
-	print 'Got torrent hash: ' + torrent_hash + '\n'
+	torrent_kind = sys.argv[2]  # Kind of the torrent, %K
+	torrent_prev = sys.argv[3]  # Kind of the torrent, %P
+	torrent_state = sys.argv[4]  # Kind of the torrent, %S
+
+	if int(torrent_state) == 4 or\
+		 int(torrent_state) == 5 or\
+		 int(torrent_state) == 7 or\
+		 int(torrent_state) == 8 or\
+		 int(torrent_state) == 10:
+		torrent_state = 'seeding'
+	elif int(torrent_state) == 6 or int(torrent_state) == 9:
+		torrent_state = 'downloading'
+	elif int(torrent_state) == 11:
+		torrent_state = 'finished'
+	if int(torrent_prev) == 4 or\
+		 int(torrent_prev) == 5 or\
+		 int(torrent_prev) == 7 or\
+		 int(torrent_prev) == 8 or\
+		 int(torrent_prev) == 10:
+		torrent_prev = 'seeding'
+	elif int(torrent_prev) == 6 or int(torrent_prev) == 9:
+		torrent_prev = 'downloading'
+	elif int(torrent_prev) == 11:
+		torrent_prev = 'finished'
+
+	print 'torrent hash:\t\t' + torrent_hash
+	print 'previous state:\t\t' + torrent_prev
+	print 'state:\t\t' + torrent_state
+	print 'kind:\t\t' + torrent_kind + '\n'
+
 	this_dir = os.getcwd()
 	config = ConfigParser.ConfigParser()
 	configFilename = os.path.normpath(os.path.join(this_dir, "config.cfg"))
@@ -223,12 +246,11 @@ if __name__ == "__main__":
 		print 'Could not read config - exiting' + '\n'
 		exit(-1)
 
-
 	if len(torrent_hash) == 32:
 		torrent_hash = b16encode(b32decode(torrent_hash))
 
 	if len(torrent_hash) == 40:
 		pp = PoisonProcess()
-		pp.main(torrent_hash)
+		pp.main(torrent_hash, torrent_kind, torrent_state, torrent_prev)
 	else:
 		print 'Script only compatible with uTorrent 3.0+'
