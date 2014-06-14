@@ -1,24 +1,19 @@
 # README #
 
-This README would normally document whatever steps are necessary to get your application up and running.
+### Requirements ###
 
-### What is this repository for? ###
-
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+* Python 2.6+
+* uTorrent 3.0+
 
 ### How do I get set up? ###
 
-* In uTorrent go to settings>
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+* In uTorrent go to settings > advanced > run program > run program when torrent changes state
+* "Path\to\pythonw.exe Path\to\poisonprocess.py" %I
+* with quotes
 
 ### TODO ###
 
 * Finish copying folder structure
 * Edit the deleting script ( should be easy )
 * Delete unwanted items in destination folder
+* Implement theRenamer or couchpotato/sickbeard postprocess scripts
