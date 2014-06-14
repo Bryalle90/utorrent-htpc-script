@@ -9,7 +9,8 @@
 
 * In uTorrent go to settings , advanced , run program , run program when torrent changes state
 * input(with quotes):
-	"Path\to\pythonw.exe Path\to\poisonprocess.py" %I
+* "Path\to\pythonw.exe Path\to\poisonprocess.py" %I
+* edit included config.cfg file
 
 ## TODO ##
 
