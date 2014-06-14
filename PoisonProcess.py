@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import binascii
 import ConfigParser
@@ -43,27 +43,35 @@ class PoisonProcess(object):
 		torrent = uTorrent.find_torrent(torrent_hash)
 		torrent_info = uTorrent.get_info(torrent)
 		
+		torrent_state = torrent_info['state'].split(' ')
+		torrent_state = torrent_state[1] if torrent_state[0] == '[F]' or torrent_state[0] == 'Queued' or torrent_state[0] == 'Super' and not torrent_state[1] == '' else torrent_state[0]
+		torrent_state = torrent_state.lower()
+		
 		#
 		if torrent_info:
-			if torrent_info['state'] == 'Seeding' or torrent_info['state'] == '[F] Seeding' or torrent_info['state'] == 'Queued seed':
-				destination = os.path.normpath(os.path.join(output_dir, torrent_info['label'] if append_label else '', torrent_info['name'] if append_torName else ''))
-			
+			if torrent_state == 'seeding' or torrent_state == 'seed':
+
+				# get what files to keep and what to extract
+				keep_files, compressed_files, keep_structure = filter_files(torrent_info['files'], torrent_info['label'])
+
 				# create destination if it doesn't exist
+				destination = os.path.normpath(os.path.join(output_dir, torrent_info['label'] if append_label else '', torrent_info['name'] if append_torName and not keep_structure else ''))
 				self.make_directories(destination)
 			
-				# get what files to keep and what to extract
-				keep_files, compressed_files = filter_files(torrent_info['files'], torrent_info['label'])
 				
 				# TODO: look through rest of code starting here
-				# Loop through keep_files and copy the files
-				for f in keep_files:
-					file_name = os.path.split(f)[1]
-					if self.process_file(f, destination, file_action):
-						print("Successfully copied: %s", file_name)
-					else:
-						print("Failed to copy: %s", file_name)
+				if keep_structure:
+					copy_tree(torrent_info['folder'], )
+				else:
+					# Loop through keep_files and copy the files
+					for f in keep_files:
+						file_name = os.path.split(f)[1]
+						if self.copy_file(f, destination):
+							print("Successfully copied: %s", file_name)
+						else:
+							print("Failed to copy: %s", file_name)
 
-				# Loop through extract_files and extract all files
+				# Loop through compressed_files and extract all files
 				for f in compressed_files:
 					file_name = os.path.split(f)[1]
 					if self.extract_file(f, destination):
@@ -71,25 +79,19 @@ class PoisonProcess(object):
 					else:
 						print("Failed to extract: %s", file_name)
 
-	def filter_files(self, files, label):	# returns a list of files to keep in destination and a list of files to extract
+	def filter_files(self, files, label):	# returns a list of files to keep in destination and a list of files to extract and whether or not to keep the folder structure
 		ignore_words = (config.get("Extensions", "ignore")).split('|')
 		archive_ext = tuple((config.get("Extensions", "compressed")).split('|'))
 		keep_ext = []
 		keep_files = []
 		compressed_files = []
+		kfs = False
 		
 		label_config = ConfigParser.ConfigParser()
 		
 		if os.path.exists(os.path.join(this_dir, 'labels', label) + '.cfg'):
 			label_file = os.path.normpath(os.path.join(this_dir, 'labels', label) + '.cfg')
 			label_config.read(label_file)
-			file_prefs = {
-						'video': label_config.getboolean("Type", "video") ,
-						'audio': label_config.getboolean("Type", "audio") ,
-						'image': label_config.getboolean("Type", "image") ,
-						'subs': label_config.getboolean("Type", "subtitle") ,
-						'readme': label_config.getboolean("Type", "readme") ,
-			}
 			if label_config.getboolean("Type", "video"):
 				keep_ext.extend(config.get("Extensions", "video").split('|'))
 			if label_config.getboolean("Type", "audio"):
@@ -101,6 +103,7 @@ class PoisonProcess(object):
 			if label_config.getboolean("Type", "readme"):
 				keep_ext.extend(config.get("Extensions", "readme").split('|'))
 			keep_ext = tuple(keep_ext)
+			kfs = label_config.getboolean("Type", "keepFolderStructure")
 		else:
 			print 'label file does not exist'
 
@@ -115,9 +118,9 @@ class PoisonProcess(object):
 					if f.endswith('.rar') and is_mainRar(f):	# This will ignore rar sets where all (rar) files end with .rar
 						compressed_files.append(f)
 
-		return keep_files, compressed_files
+		return keep_files, compressed_files, kfs
 		
-	def is_mainRar(self, file):	# checks if file is the main rar file in a rar set or just a single rar
+	def is_mainRar(self, file):	# returns true if file is the main rar file in a rar set or just a single rar
 		with open(file, "rb") as file:
 			byte = file.read(12)
 
@@ -131,55 +134,55 @@ class PoisonProcess(object):
 
 		return False
 			
-		def make_directories(self, destination):
-			if not os.path.exists(destination):
-				try:
-					os.makedirs(destination)
-				except OSError as e:
-					if e.errno != errno.EEXIST:
-						raise
-					pass
+	def make_directories(self, directory):	# creates a directory if it doesn't already exist
+		if not os.path.exists(directory):
+			try:
+				os.makedirs(directory)
+			except OSError as e:
+				if e.errno != errno.EEXIST:
+					raise
+				pass
 
-    def process_file(self, source_file, destination, action):
-        file_name = os.path.split(source_file)[1]
-        destination_file = os.path.join(destination, file_name)
-        if not os.path.isfile(destination_file):
-            try:
-                if action == "move":
-                    logger.debug(loggerHeader + "Moving file: %s to: %s", file_name, destination)
-                    shutil.move(source_file, destination_file)
-                elif action == "link":
-                    logger.debug(loggerHeader + "Linking file: %s to: %s", file_name, destination)
-                    link(source_file, destination_file)
-                elif action == "symlink":
-                    logger.debug(loggerHeader + "Sym-linking file: %s to: %s", file_name, destination)
-                    symlink(source_file, destination_file)
-                elif action == "copy":
-                    logger.debug(loggerHeader + "Copying file: %s to: %s", file_name, destination)
-                    shutil.copy(source_file, destination_file)
+	def copy_file(self, source_file, destination):	# copies a file to a destination folder
+		file_name = os.path.split(source_file)[1]
+		destination_file = os.path.join(destination, file_name)
+		if not os.path.isfile(destination_file):
+			try:
+				print "Copying file: %s to: %s", file_name, destination
+				shutil.copy2(source_file, destination_file)
 
-                return True
+				return True
 
-            except Exception, e:
-                logger.error(loggerHeader + "Failed to process %s: %s %s", file_name, e, traceback.format_exc())
-            return False
+			except Exception, e:
+				print "Failed to process %s: %s %s", file_name, e, traceback.format_exc()
+			return False
+
+	def copy_tree(src, dest):
+		try:
+			shutil.copytree(src, dest)
+		except OSError as e:
+			# If the error was caused because the source wasn't a directory
+			if e.errno == errno.ENOTDIR:
+				shutil.copy(src, dst)
+			else:
+				print('Directory not copied. Error: %s' % e)
 					
-    def extract_file(self, source_file, destination):
-        try:
-            rar_handle = RarFile(source_file)
-            for rar_file in rar_handle.infolist():
-                sub_path = os.path.join(destination, rar_file.filename)
-                if rar_file.isdir and not os.path.exists(sub_path):
-                    os.makedirs(sub_path)
-                else:
-                    rar_handle.extract(condition=[rar_file.index], path=destination, withSubpath=True, overwrite=False)
-            del rar_handle
-            return True
+	def extract_file(self, source_file, destination):
+		try:
+			rar_handle = RarFile(source_file)
+			for rar_file in rar_handle.infolist():
+				sub_path = os.path.join(destination, rar_file.filename)
+				if rar_file.isdir and not os.path.exists(sub_path):
+					os.makedirs(sub_path)
+				else:
+					rar_handle.extract(condition=[rar_file.index], path=destination, withSubpath=True, overwrite=False)
+			del rar_handle
+			return True
 
-        except Exception, e:
-            logger.error(loggerHeader + "Failed to extract %s: %s %s", os.path.split(source_file)[1],
-                         e, traceback.format_exc())
-        return False
+		except Exception, e:
+			logger.error(loggerHeader + "Failed to extract %s: %s %s", os.path.split(source_file)[1],
+						 e, traceback.format_exc())
+		return False
 
 if __name__ == "__main__":
 	this_dir = os.getcwd()
@@ -187,13 +190,15 @@ if __name__ == "__main__":
 	configFilename = os.path.normpath(os.path.join(os.path.dirname(sys.argv[0]), "config.cfg"))
 	config.read(configFilename)
 	
+	exit(0)
+
 	torrent_hash = sys.argv[1]  # Hash of the torrent, %I
 
 	if len(torrent_hash) == 32:
 		torrent_hash = b16encode(b32decode(torrent_hash))
 
 	if len(torrent_hash) == 40:
-		rp = PoisonProcess()
-		rp.main(torrent_hash)
+		pp = PoisonProcess()
+		pp.main(torrent_hash)
 	else:
 		print 'Script only compatible with uTorrent 3.1+'
