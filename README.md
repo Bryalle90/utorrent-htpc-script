@@ -17,6 +17,6 @@
 * Finish copying folder structure - Done
 * Finish extracting file to destination - Done
 * Edit the deleting script ( should be easy )
-* Delete unwanted items in destination folder
+* Delete unwanted items in destination folder - Done
 * Implement theRenamer or couchpotato/sickbeard postprocess scripts
 * Implement notifications

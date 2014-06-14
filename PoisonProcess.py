@@ -2,6 +2,7 @@ import os
 import sys
 import binascii
 import ConfigParser
+import shutil
 import libs.client.utorrent as TorClient
 from libs.unrar2 import RarFile
 
@@ -34,7 +35,7 @@ class PoisonProcess(object):
 		#connect to utorrent and get info for torrent using torrent hash
 		uTorrent = TorClient.TorrentClient()
 		if not uTorrent.connect(webui_URL, webui_user, webui_pass):
-			print 'could not connect to utorrent - exiting'
+			print 'could not connect to utorrent - exiting' + '\n'
 			sys.exit(-1)
 		torrent = uTorrent.find_torrent(torrent_hash)
 		torrent_info = uTorrent.get_info(torrent)
@@ -46,34 +47,51 @@ class PoisonProcess(object):
 											torrent_state[1] == '' else \
 											torrent_state[0]
 		torrent_state = torrent_state.lower()
-		
-		#
+
+		print 'Successfully connected to uTorrent'
+		print 'torrent state: ' + torrent_state + '\n'
+
 		if torrent_info:
 			if torrent_state == 'seeding' or torrent_state == 'seed':
 
 				# get what files to keep and what to extract
-				keep_files, compressed_files, keep_structure, keep_ext = filter_files(torrent_info['files'], torrent_info['label'])
+				keep_files, compressed_files, keep_structure, keep_ext = self.filter_files(torrent_info['files'], torrent_info['label'])
 
 				if keep_structure:
 					destination = os.path.normpath(os.path.join(output_dir,
 																torrent_info['label'] if append_label else '',
 																torrent_info['name']))
+					print 'Copying files from: ' + torrent_info['folder']
+					print 'to: ' + destination
+					print '--'
 					self.copy_tree(os.path.normpath(torrent_info['folder']), destination, keep_ext)
+					print '--\n'
 				else:
 					# create destination if it doesn't exist
 					destination = os.path.normpath(os.path.join(output_dir,
 																torrent_info['label'] if append_label else '',
 																torrent_info['name'] if append_torName else ''))
 					self.make_directories(destination)
+					print 'Copying files from: ' + torrent_info['folder']
+					print 'to: ' + destination
+
 					# Loop through keep_files and copy the files
+					print '--'
 					for f in keep_files:
-						file_name = os.path.split(f)[1]
 						self.copy_file(f, destination)
+					print '--\n'
 
 				# Loop through compressed_files and extract all files
+				print 'Extracting files to: ' + destination
+				print '--'
 				for f in compressed_files:
-					file_name = os.path.split(f)[1]
 					self.extract_file(f, destination)
+				print '--\n'
+
+				print 'Cleaning up unwanted files in: ' + destination
+				print '--'
+				self.clean_dest(destination, keep_ext)
+				print '--\n'
 
 	def filter_files(self, files, label):	# returns a list of files to keep in destination and a list of files to extract and whether or not to keep the folder structure
 		ignore_words = (config.get("Extensions", "ignore")).split('|')
@@ -88,6 +106,7 @@ class PoisonProcess(object):
 		if os.path.exists(os.path.join(this_dir, 'labels', label) + '.cfg'):
 			label_file = os.path.normpath(os.path.join(this_dir, 'labels', label) + '.cfg')
 			label_config.read(label_file)
+
 			if label_config.getboolean("Type", "video"):
 				keep_ext.extend(config.get("Extensions", "video").split('|'))
 			if label_config.getboolean("Type", "audio"):
@@ -100,9 +119,14 @@ class PoisonProcess(object):
 				keep_ext.extend(config.get("Extensions", "readme").split('|'))
 			keep_ext = tuple(keep_ext)
 			kfs = label_config.getboolean("Type", "keepFolderStructure")
-		else:
-			print 'label file does not exist'
 
+			print 'Successfully read label config file' + '\n'
+			print 'Keeping files with extension: '
+			for e in keep_ext:
+				print '\t\t\t\t' + e
+			print ''
+		else:
+			print 'label file, ' + label + '.cfg does not exist' + '\n'
 			
 		# Sort files into lists depending on file extension
 		for f in files:
@@ -111,7 +135,7 @@ class PoisonProcess(object):
 					keep_files.append(f)
 
 				elif f.endswith(archive_ext):
-					if f.endswith('.rar') and is_mainRar(f):	# This will ignore rar sets where all (rar) files end with .rar
+					if f.endswith('.rar') and self.is_mainRar(f):	# This will ignore rar sets where all (rar) files end with .rar
 						compressed_files.append(f)
 
 		return keep_files, compressed_files, kfs, keep_ext
@@ -147,9 +171,9 @@ class PoisonProcess(object):
 				shutil.copy2(source_file, destination_file)
 				print 'Successfully copied ' + file_name + ' to destination'
 			except Exception, e:
-				print 'Failed to copy ' + file_name + ': ' + e + ' ' + traceback.format_exc()
+				print 'Failed to copy ' + file_name + '\n'
 		else:
-			print file_name + ' already exists in destination, skipping'
+			print file_name + ' already exists in destination - skipping'
 
 	def copy_tree(self, source, dest, keep_ext):	# copies a folder structure to destination and only files with the specified extensions
 		for dirName, subdirList, fileList in os.walk(source):
@@ -175,15 +199,30 @@ class PoisonProcess(object):
 		except Exception, e:
 			print "Failed to extract " + os.path.split(source_file)[1] + ": " + e + " " + traceback.format_exc()
 
+	def clean_dest(self, dest, keep_ext):
+		for dirName, subdirList, fileList in os.walk(dest):
+			for fname in fileList:
+				if not fname.endswith(keep_ext):
+					print 'deleting: ' + fname
+					os.remove(os.path.normpath(os.path.join(dirName, fname)))
+		for dirName, subdirList, fileList in os.walk(dest, topdown=False):
+			if len(fileList) == 0 and len(subdirList) == 0:
+				os.rmdir(dirName)
+
+
 if __name__ == "__main__":
+	torrent_hash = sys.argv[1]  # Hash of the torrent, %I
+	print 'Got torrent hash: ' + torrent_hash + '\n'
 	this_dir = os.getcwd()
 	config = ConfigParser.ConfigParser()
 	configFilename = os.path.normpath(os.path.join(this_dir, "config.cfg"))
-	config.read(configFilename)
-	
-	exit(0)
+	try:
+		config.read(configFilename)
+		print 'Successfully read config' + '\n'
+	except:
+		print 'Could not read config - exiting' + '\n'
+		exit(-1)
 
-	torrent_hash = sys.argv[1]  # Hash of the torrent, %I
 
 	if len(torrent_hash) == 32:
 		torrent_hash = b16encode(b32decode(torrent_hash))
