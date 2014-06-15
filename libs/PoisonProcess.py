@@ -148,7 +148,6 @@ class PoisonProcess(object):
 		self.config = ConfigParser.ConfigParser()
 		try:
 			self.config.read(configFilename)
-			print configFilename
 			print 'Successfully read config' + '\n'
 		except Exception, e:
 			print e
@@ -171,7 +170,7 @@ class PoisonProcess(object):
 		self.webui_URL = 'http://localhost:' + str(self.webui_port) + '/gui/'
 		self.webui_user = self.config.get("Client", "username")
 		self.webui_pass = self.config.get("Client", "password")
-		
+
 		#connect to utorrent and get info for torrent using torrent hash
 		uTorrent = TorClient.TorrentClient()
 		if not uTorrent.connect(self.webui_URL, self.webui_user, self.webui_pass):
@@ -183,7 +182,7 @@ class PoisonProcess(object):
 		if self.torrent_info:
 
 			# if torrent goes from downloading -> seeding, copy and extract files
-			if torrent_prev == 'downloading' and torrent_state == 'seeding':
+			if torrent_prev == 'downloading' and (torrent_state == 'seeding' or torrent_state == 'moving'):
 
 				# get what files to keep and what to extract
 				self.keep_files, self.compressed_files, self.keep_structure, self.keep_ext, self.renamer_type = self.filter_files(self.config, this_dir, self.torrent_info['files'], self.torrent_info['label'])
@@ -211,7 +210,7 @@ class PoisonProcess(object):
 					for f in self.keep_files:
 						self.copy_file(f, self.destination)
 					print '--\n'
-
+					
 				# Loop through compressed_files and extract all files
 				print 'Extracting files to: ' + self.destination
 				print '--'
@@ -225,10 +224,12 @@ class PoisonProcess(object):
 				print '--\n'
 
 				if self.useRenamer and not self.renamer_type == None:
+					print 'Renaming files with theRenamer'
 					self.renamer_path = self.config.get("Renamer", "renamerPath")
 					self.renamer_path = os.path.join(self.renamer_path, 'theRenamer.exe')
 					try:
 						subprocess.call([self.renamer_path, self.renamer_type])
+						print 'Files renamed!\n'
 					except Exception, e:
 						print 'could not call renamer' + e
 

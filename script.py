@@ -15,8 +15,11 @@ if int(torrent_state) == 4 or\
 	torrent_state = 'seeding'
 elif int(torrent_state) == 6 or int(torrent_state) == 9:
 	torrent_state = 'downloading'
+elif int(torrent_state) == 20:
+	torrent_state = 'moving'
 elif int(torrent_state) == 11:
 	torrent_state = 'finished'
+
 if int(torrent_prev) == 4 or\
 	 int(torrent_prev) == 5 or\
 	 int(torrent_prev) == 7 or\
@@ -25,6 +28,8 @@ if int(torrent_prev) == 4 or\
 	torrent_prev = 'seeding'
 elif int(torrent_prev) == 6 or int(torrent_prev) == 9:
 	torrent_prev = 'downloading'
+elif int(torrent_prev) == 20:
+	torrent_prev = 'moving'
 elif int(torrent_prev) == 11:
 	torrent_prev = 'finished'
 

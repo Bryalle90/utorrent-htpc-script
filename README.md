@@ -20,6 +20,9 @@ date: June 15, 2014
 * input(with quotes):
                 "Path\to\pythonw.exe" "Path\to\script.py" %I %K %P %S
 * edit included config.cfg file
+* it is recommended to at least keep seeding for a few mins to allow time for 
+  script to finish extracting and moving files before removing the torrent
+  from uTorrent, if enabled
 
 ## TODO ##
 
