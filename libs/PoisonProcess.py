@@ -11,7 +11,7 @@ class PoisonProcess(object):
 	def __init__(self):
 		pass
 
-	def filter_files(self, config, this_dir, files, label):	# returns a list of files to keep in destination and a list of files to extract and whether or not to keep the folder structure
+	def filter_files(self, config, main_dir, files, label):	# returns a list of files to keep in destination and a list of files to extract and whether or not to keep the folder structure
 		ignore_words = (config.get("Extensions", "ignore")).split('|')
 		archive_ext = tuple((config.get("Extensions", "compressed")).split('|'))
 		keep_ext = []
@@ -20,31 +20,37 @@ class PoisonProcess(object):
 		kfs = False
 		
 		label_config = ConfigParser.ConfigParser()
+		keep_ext.extend(config.get("Extensions", "video").split("|"),
+						config.get("Extensions", "audio").split("|"),
+						config.get("Extensions", "image").split("|"),
+						config.get("Extensions", "subtitle").split("|"),
+						config.get("Extensions", "readme").split("|"))
 		
-		if os.path.exists(os.path.join(this_dir, 'labels', label) + '.cfg'):
-			label_file = os.path.normpath(os.path.join(this_dir, 'labels', label) + '.cfg')
-			label_config.read(label_file)
+		if not label == '':
+			if os.path.exists(os.path.join(main_dir, 'labels', label) + '.cfg'):
+				label_file = os.path.normpath(os.path.join(main_dir, 'labels', label) + '.cfg')
+				label_config.read(label_file)
 
-			if label_config.getboolean("Type", "video"):
-				keep_ext.extend(config.get("Extensions", "video").split('|'))
-			if label_config.getboolean("Type", "audio"):
-				keep_ext.extend(config.get("Extensions", "audio").split('|'))
-			if label_config.getboolean("Type", "image"):
-				keep_ext.extend(config.get("Extensions", "image").split('|'))
-			if label_config.getboolean("Type", "subtitle"):
-				keep_ext.extend(config.get("Extensions", "subtitle").split('|'))
-			if label_config.getboolean("Type", "readme"):
-				keep_ext.extend(config.get("Extensions", "readme").split('|'))
-			keep_ext = tuple(keep_ext)
-			kfs = label_config.getboolean("Type", "keepFolderStructure")
+				if label_config.getboolean("Type", "video"):
+					keep_ext.extend(config.get("Extensions", "video").split('|'))
+				if label_config.getboolean("Type", "audio"):
+					keep_ext.extend(config.get("Extensions", "audio").split('|'))
+				if label_config.getboolean("Type", "image"):
+					keep_ext.extend(config.get("Extensions", "image").split('|'))
+				if label_config.getboolean("Type", "subtitle"):
+					keep_ext.extend(config.get("Extensions", "subtitle").split('|'))
+				if label_config.getboolean("Type", "readme"):
+					keep_ext.extend(config.get("Extensions", "readme").split('|'))
+				keep_ext = tuple(keep_ext)
+				kfs = label_config.getboolean("Type", "keepFolderStructure")
 
-			print 'Successfully read ' + label + ' config file' + '\n'
-			print 'Keeping files with extension: '
-			for e in keep_ext:
-				print '\t\t\t\t' + e
-			print ''
-		else:
-			print 'label file, ' + label + '.cfg does not exist' + '\n'
+				print 'Successfully read ' + label + ' config file' + '\n'
+				print 'Keeping files with extension: '
+				for ext in keep_ext:
+					print '\t\t\t\t' + ext
+				print ''
+			else:
+				print 'label file, ' + label + '.cfg does not exist' + '\n'
 			
 		# Sort files into lists depending on file extension
 		for f in files:
