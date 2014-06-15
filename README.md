@@ -1,6 +1,6 @@
 # README #
 
-version: 0.1
+version: 0.2
 date: June 15, 2014
 
 ## Program Requirements ##
@@ -23,6 +23,10 @@ date: June 15, 2014
 * it is recommended to at least keep seeding for a few mins to allow time for 
   script to finish extracting and moving files before removing the torrent
   from uTorrent, if enabled
+
+### theRenamer ###
+
+* set up theRenamer source folders to the output folder in the config
 
 ## TODO ##
 
