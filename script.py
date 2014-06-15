@@ -44,7 +44,7 @@ if len(torrent_hash) == 32:
 if len(torrent_hash) == 40:
 	pp = PoisonProcess()
 	try:
-		pp.process(this_dir, configFilename, torrent_hash, torrent_kind, torrent_prev, torrent_state)
+		pp.process_torrent(this_dir, configFilename, torrent_hash, torrent_kind, torrent_prev, torrent_state)
 	except Exception, e:
 		print e
 else:
