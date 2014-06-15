@@ -1,5 +1,8 @@
 # README #
 
+version: 0.1
+date: June 15, 2014
+
 ## Program Requirements ##
 
 ### Required ###
