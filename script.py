@@ -1,7 +1,5 @@
 import os
 import sys
-import binascii
-import ConfigParser
 from libs.PoisonProcess import PoisonProcess
 
 torrent_hash = sys.argv[1]  # Hash of the torrent, %I

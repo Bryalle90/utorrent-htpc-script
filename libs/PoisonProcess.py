@@ -1,10 +1,10 @@
 import os
 import sys
-import binascii
-import ConfigParser
-import shutil
 import errno
+import shutil
+import binascii
 import subprocess
+import ConfigParser
 import libs.client.utorrent as TorClient
 from libs.unrar2 import RarFile
 
