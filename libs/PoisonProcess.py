@@ -4,6 +4,7 @@ import binascii
 import ConfigParser
 import shutil
 import errno
+import subprocess
 import libs.client.utorrent as TorClient
 from libs.unrar2 import RarFile
 
@@ -18,6 +19,7 @@ class PoisonProcess(object):
 		keep_files = []
 		compressed_files = []
 		kfs = False
+		renamer_type = None
 		
 		label_config = ConfigParser.ConfigParser()
 		keep_ext.extend(config.get("Extensions", "video").split("|"),
@@ -42,7 +44,16 @@ class PoisonProcess(object):
 				if label_config.getboolean("Type", "readme"):
 					keep_ext.extend(config.get("Extensions", "readme").split('|'))
 				keep_ext = tuple(keep_ext)
-				kfs = label_config.getboolean("Type", "keepFolderStructure")
+				
+				kfs = label_config.getboolean("Folders", "keepFolderStructure")
+
+				renamer_type = label_config.get("Renamer", "renamerType")
+				if renamer_type == 'movie':
+					renamer_type = '-fetchmovie'
+				elif renamer_type == 'tv':
+					renamer_type = '-fetch'
+				else:
+					renamer_type = None
 
 				print 'Successfully read ' + label + ' config file' + '\n'
 				print 'Keeping files with extension: '
@@ -62,7 +73,7 @@ class PoisonProcess(object):
 					if f.endswith('.rar') and self.is_mainRar(f):	# This will ignore rar sets where all (rar) files end with .rar
 						compressed_files.append(f)
 
-		return keep_files, compressed_files, kfs, keep_ext
+		return keep_files, compressed_files, kfs, keep_ext, renamer_type
 		
 	def is_mainRar(self, file):	# returns true if file is the main rar file in a rar set or just a single rar
 		with open(file, "rb") as file:
@@ -133,7 +144,7 @@ class PoisonProcess(object):
 			if len(fileList) == 0 and len(subdirList) == 0:
 				os.rmdir(dirName)
 	
-	def process(self, this_dir, configFilename, torrent_hash, torrent_kind, torrent_prev, torrent_state):
+	def process_torrent(self, this_dir, configFilename, torrent_hash, torrent_kind, torrent_prev, torrent_state):
 		self.config = ConfigParser.ConfigParser()
 		try:
 			self.config.read(configFilename)
@@ -148,8 +159,6 @@ class PoisonProcess(object):
 		self.deleteOnFinish = self.config.getboolean("General", "remove")
 		
 		self.useRenamer = self.config.getboolean("Renamer", "useTheRenamer")
-		if self.useRenamer:
-			self.renamer_path = self.config.get("Renamer", "renamerPath")
 		
 		self.email_notify = self.config.getboolean("Notifications", "email")
 		self.email_server = self.config.get("Notifications", "SMTPServer")
@@ -168,7 +177,6 @@ class PoisonProcess(object):
 		if not uTorrent.connect(self.webui_URL, self.webui_user, self.webui_pass):
 			print 'could not connect to utorrent - exiting' + '\n'
 			sys.exit(-1)
-
 		self.torrent = uTorrent.find_torrent(torrent_hash)
 		self.torrent_info = uTorrent.get_info(self.torrent)
 
@@ -178,7 +186,7 @@ class PoisonProcess(object):
 			if torrent_prev == 'downloading' and torrent_state == 'seeding':
 
 				# get what files to keep and what to extract
-				self.keep_files, self.compressed_files, self.keep_structure, self.keep_ext = self.filter_files(self.config, this_dir, self.torrent_info['files'], self.torrent_info['label'])
+				self.keep_files, self.compressed_files, self.keep_structure, self.keep_ext, self.renamer_type = self.filter_files(self.config, this_dir, self.torrent_info['files'], self.torrent_info['label'])
 
 				if self.keep_structure and torrent_kind == 'multi':
 					self.destination = os.path.normpath(os.path.join(self.output_dir,
@@ -216,9 +224,16 @@ class PoisonProcess(object):
 				self.clean_dest(self.destination, self.keep_ext)
 				print '--\n'
 
+				if self.useRenamer and not self.renamer_type == None:
+					self.renamer_path = self.config.get("Renamer", "renamerPath")
+					try:
+						subprocess.call([self.renamer_path, self.renamer_type])
+					except Exception, e:
+						print e
+
 			# if torrent goes from seeding -> finished, remove torrent from list
 			elif torrent_prev == 'seeding' and torrent_state == 'finished' and self.deleteOnFinish:
 				print 'Removing torrent: ' + self.torrent_info['name']
 				uTorrent.delete_torrent(self.torrent)
 		else:
-			print 'did not get torrent info'
+			print 'could not get torrent info'
