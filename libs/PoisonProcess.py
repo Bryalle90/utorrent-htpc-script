@@ -22,11 +22,6 @@ class PoisonProcess(object):
 		renamer_type = None
 		
 		label_config = ConfigParser.ConfigParser()
-		keep_ext.extend(config.get("Extensions", "video").split("|"),
-						config.get("Extensions", "audio").split("|"),
-						config.get("Extensions", "image").split("|"),
-						config.get("Extensions", "subtitle").split("|"),
-						config.get("Extensions", "readme").split("|"))
 		
 		if not label == '':
 			if os.path.exists(os.path.join(main_dir, 'labels', label) + '.cfg'):
@@ -43,7 +38,6 @@ class PoisonProcess(object):
 					keep_ext.extend(config.get("Extensions", "subtitle").split('|'))
 				if label_config.getboolean("Type", "readme"):
 					keep_ext.extend(config.get("Extensions", "readme").split('|'))
-				keep_ext = tuple(keep_ext)
 				
 				kfs = label_config.getboolean("Folders", "keepFolderStructure")
 
@@ -56,12 +50,18 @@ class PoisonProcess(object):
 					renamer_type = None
 
 				print 'Successfully read ' + label + ' config file' + '\n'
-				print 'Keeping files with extension: '
-				for ext in keep_ext:
-					print '\t\t\t\t' + ext
-				print ''
 			else:
+				keep_ext.extend([config.get("Extensions", "video").split("|"),
+								config.get("Extensions", "audio").split("|"),
+								config.get("Extensions", "image").split("|"),
+								config.get("Extensions", "subtitle").split("|"),
+								config.get("Extensions", "readme").split("|")])
 				print 'label file, ' + label + '.cfg does not exist' + '\n'
+			keep_ext = tuple(keep_ext)
+			print 'Keeping files with extension: '
+			for ext in keep_ext:
+				print '\t\t\t\t' + ext
+			print ''
 			
 		# Sort files into lists depending on file extension
 		for f in files:
@@ -226,10 +226,11 @@ class PoisonProcess(object):
 
 				if self.useRenamer and not self.renamer_type == None:
 					self.renamer_path = self.config.get("Renamer", "renamerPath")
+					self.renamer_path = os.path.join(self.renamer_path, 'theRenamer.exe')
 					try:
 						subprocess.call([self.renamer_path, self.renamer_type])
 					except Exception, e:
-						print e
+						print 'could not call renamer' + e
 
 			# if torrent goes from seeding -> finished, remove torrent from list
 			elif torrent_prev == 'seeding' and torrent_state == 'finished' and self.deleteOnFinish:
