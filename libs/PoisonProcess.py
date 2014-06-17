@@ -7,6 +7,7 @@ import subprocess
 import ConfigParser
 import libs.client.utorrent as TorClient
 from libs.unrar2 import RarFile
+from libs.notifications import email
 
 class PoisonProcess(object):
 	def __init__(self):
@@ -235,8 +236,10 @@ class PoisonProcess(object):
 					except Exception, e:
 						print 'could not call renamer' + e
 
-			# if torrent goes from seeding -> finished, remove torrent from list
-			elif torrent_prev == 'seeding' and torrent_state == 'finished' and self.deleteOnFinish:
+				
+
+			# if torrent goes from seeding -> finished and has a label config file, remove torrent from list
+			elif torrent_prev == 'seeding' and torrent_state == 'finished' and self.deleteOnFinish and if os.path.exists(os.path.join(this_dir, 'labels', self.torrent_info['label']) + '.cfg'):
 				print 'Removing torrent: ' + self.torrent_info['name']
 				uTorrent.delete_torrent(self.torrent)
 		else:
