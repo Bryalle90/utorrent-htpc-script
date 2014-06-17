@@ -134,10 +134,10 @@ class PoisonProcess(object):
 		except Exception, e:
 			print "Failed to extract " + os.path.split(source_file)[1] + ": " + e + " " + traceback.format_exc()
 
-	def clean_dest(self, dest, keep_ext): # cleans the destination of all files that done end with extensions in keep_ext
+	def clean_dest(self, dest, keep_ext, ignore_words): # cleans the destination of all files that done end with extensions in keep_ext
 		for dirName, subdirList, fileList in os.walk(dest):
 			for fname in fileList:
-				if not fname.endswith(keep_ext):
+				if not fname.endswith(keep_ext) or any(word in fname for word in ignore_words):
 					print 'deleting: ' + fname
 					os.remove(os.path.normpath(os.path.join(dirName, fname)))
 		for dirName, subdirList, fileList in os.walk(dest, topdown=False):
@@ -158,6 +158,8 @@ class PoisonProcess(object):
 		self.deleteOnFinish = self.config.getboolean("General", "remove")
 		
 		self.useRenamer = self.config.getboolean("Renamer", "useTheRenamer")
+
+		self.ignore_words = (config.get("Extensions", "ignore")).split('|')
 		
 		self.email_notify = self.config.getboolean("Notifications", "email")
 		self.email_server = self.config.get("Notifications", "SMTPServer")
@@ -220,7 +222,7 @@ class PoisonProcess(object):
 
 				print 'Cleaning up unwanted files in: ' + self.destination
 				print '--'
-				self.clean_dest(self.destination, self.keep_ext)
+				self.clean_dest(self.destination, self.keep_ext, self.ignore_words)
 				print '--\n'
 
 				if self.useRenamer and not self.renamer_type == None:
