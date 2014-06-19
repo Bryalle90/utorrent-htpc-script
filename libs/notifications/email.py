@@ -1,21 +1,20 @@
 import smtplib
-import time
 
-class email():
+class Email():
 	def __init__(self):
 		pass
 
-	def send_email(self, to, username, password, smtp_server, smtp_port, email_info):
+	def send_email(self, email_info, notification_info):
 
 		receivers = []
 
-		receivers.extend(to.split('|'))
+		receivers.extend(email_info['to'].split('|'))
 		subject = 'Poison\'s autoHTPC Script Notification'
-		title = email_info['title']
-		label = email_info['label']
-		date = time.strftime("%m/%d/%Y")
-		ctime = time.strftime("%I:%M:%S%p")
-		action = email_info['action']
+		title = notification_info['title']
+		label = notification_info['label']
+		date = notification_info['date']
+		ctime = notification_info['time']
+		action = notification_info['action']
 
 		try:
 			smtpserver = smtplib.SMTP(smtp_server,smtp_port)
@@ -28,7 +27,6 @@ class email():
 			return False
 
 		header = 'Content-type: text/html\n' + 'Subject:' + subject + '\n'
-
 		body = """
 		<html xmlns="http://www.w3.org/1999/xhtml">
 			<head>
@@ -78,6 +76,7 @@ class email():
 		msg = header + body
 
 		smtpserver.sendmail(username, receivers, msg)
-		print 'email sent!'
+
 		smtpserver.close()
+
 		return True
