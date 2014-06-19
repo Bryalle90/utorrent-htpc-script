@@ -27,45 +27,44 @@ class PoisonProcess(object):
 		renamer_type = None
 		label_config = ConfigParser.ConfigParser()
 		
-		if not label == '':
-			if os.path.exists(os.path.join(main_dir, 'labels', label) + '.cfg'):
-				label_file = os.path.normpath(os.path.join(main_dir, 'labels', label) + '.cfg')
-				label_config.read(label_file)
+		if os.path.exists(os.path.join(main_dir, 'labels', label) + '.cfg'):
+			label_file = os.path.normpath(os.path.join(main_dir, 'labels', label) + '.cfg')
+			label_config.read(label_file)
 
-				if label_config.getboolean("Type", "video"):
-					keep_ext.extend(config.get("Extensions", "video").split('|'))
-				if label_config.getboolean("Type", "audio"):
-					keep_ext.extend(config.get("Extensions", "audio").split('|'))
-				if label_config.getboolean("Type", "image"):
-					keep_ext.extend(config.get("Extensions", "image").split('|'))
-				if label_config.getboolean("Type", "subtitle"):
-					keep_ext.extend(config.get("Extensions", "subtitle").split('|'))
-				if label_config.getboolean("Type", "readme"):
-					keep_ext.extend(config.get("Extensions", "readme").split('|'))
-				
-				kfs = label_config.getboolean("Folders", "keepFolderStructure")
+			if label_config.getboolean("Type", "video"):
+				keep_ext.extend(config.get("Extensions", "video").split('|'))
+			if label_config.getboolean("Type", "audio"):
+				keep_ext.extend(config.get("Extensions", "audio").split('|'))
+			if label_config.getboolean("Type", "image"):
+				keep_ext.extend(config.get("Extensions", "image").split('|'))
+			if label_config.getboolean("Type", "subtitle"):
+				keep_ext.extend(config.get("Extensions", "subtitle").split('|'))
+			if label_config.getboolean("Type", "readme"):
+				keep_ext.extend(config.get("Extensions", "readme").split('|'))
+			
+			kfs = label_config.getboolean("Folders", "keepFolderStructure")
 
-				renamer_type = label_config.get("Renamer", "renamerType")
-				if renamer_type == 'movie':
-					renamer_type = '-fetchmovie'
-				elif renamer_type == 'tv':
-					renamer_type = '-fetch'
-				else:
-					renamer_type = None
-
-				print 'Successfully read ' + label + ' config file' + '\n'
+			renamer_type = label_config.get("Renamer", "renamerType")
+			if renamer_type == 'movie':
+				renamer_type = '-fetchmovie'
+			elif renamer_type == 'tv':
+				renamer_type = '-fetch'
 			else:
-				keep_ext.extend([config.get("Extensions", "video").split("|"),
-								config.get("Extensions", "audio").split("|"),
-								config.get("Extensions", "image").split("|"),
-								config.get("Extensions", "subtitle").split("|"),
-								config.get("Extensions", "readme").split("|")])
-				print 'label file, ' + label + '.cfg does not exist' + '\n'
-			keep_ext = tuple(keep_ext)
-			print 'Keeping files with extension: '
-			for ext in keep_ext:
-				print '\t\t\t\t' + ext
-			print ''
+				renamer_type = None
+
+			print 'Successfully read ' + label + ' config file' + '\n'
+		else:
+			keep_ext.extend([config.get("Extensions", "video").split("|"),
+							config.get("Extensions", "audio").split("|"),
+							config.get("Extensions", "image").split("|"),
+							config.get("Extensions", "subtitle").split("|"),
+							config.get("Extensions", "readme").split("|")])
+			print 'label file, ' + label + '.cfg does not exist' + '\n'
+		keep_ext = tuple(keep_ext)
+		print 'Keeping files with extension: '
+		for ext in keep_ext:
+			print '\t\t\t\t' + ext
+		print ''
 		# Sort files into lists depending on file extension
 		for f in files:
 			if not any(word in f for word in ignore_words):
@@ -211,10 +210,16 @@ class PoisonProcess(object):
 		if not uTorrent.connect(self.webui_URL, self.webui_user, self.webui_pass):
 			print 'could not connect to utorrent - exiting' + '\n'
 			sys.exit(-1)
-		self.torrent = uTorrent.find_torrent(torrent_hash)
-		self.torrent_info = uTorrent.get_info(self.torrent)
 
-		if self.torrent_info:
+		try:
+			self.torrent = uTorrent.find_torrent(torrent_hash)
+			self.torrent_info = uTorrent.get_info(self.torrent)
+		except Exception, e:
+			print 'error getting torrent info'
+			print e
+			exit(-1)
+
+		if self.torrent_info and self.torrent_info['label'] != '':
 
 			self.action = None
 			# if torrent goes from downloading -> seeding, copy and extract files
@@ -298,4 +303,4 @@ class PoisonProcess(object):
 				}
 				self.notify(self.email_info, self.pb_info, self.notification_info)
 		else:
-			print 'could not get torrent info'
+			print 'label is blank - skipping'
