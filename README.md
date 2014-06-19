@@ -35,4 +35,4 @@ date: June 15, 2014
 * Delete unwanted items in destination folder - Done
 * Edit the remove torrent script ( should be easy ) - Done
 * Implement theRenamer or couchpotato/sickbeard postprocess scripts - Done
-* Implement notifications
+* Implement notifications - Done (email, pushbullet)
