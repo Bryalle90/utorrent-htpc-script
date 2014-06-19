@@ -17,11 +17,11 @@ class Email():
 		action = notification_info['action']
 
 		try:
-			smtpserver = smtplib.SMTP(smtp_server,smtp_port)
+			smtpserver = smtplib.SMTP(email_info['server'],int(email_info['port']))
 			smtpserver.ehlo()
 			smtpserver.starttls()
 			smtpserver.ehlo
-			smtpserver.login(username, password)
+			smtpserver.login(email_info['user'], email_info['pass'])
 		except Exception, e:
 			print e
 			return False
@@ -62,7 +62,6 @@ class Email():
 						<col/>
 						<col/>
 					</colgroup>
-					<tr><th align="left">Torrent:</th></tr>
 					<tr><td>Title:</td><td>%s</td></tr>
 					<tr><td>Label:</td><td>%s</td></tr>
 					<tr><td>Date:</td><td>%s</td></tr>
@@ -75,7 +74,7 @@ class Email():
 
 		msg = header + body
 
-		smtpserver.sendmail(username, receivers, msg)
+		smtpserver.sendmail(email_info['server'], receivers, msg)
 
 		smtpserver.close()
 

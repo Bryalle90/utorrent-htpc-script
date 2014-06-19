@@ -9,8 +9,8 @@ import ConfigParser
 import libs.client.utorrent as TorClient
 
 from libs.unrar2 import RarFile
-from libs.notifications.email import Email
-from libs.notifications.pushbullet import Pushbullet
+from libs.notifications import email
+from libs.notifications import pbullet
 
 class PoisonProcess(object):
 	def __init__(self):
@@ -25,7 +25,6 @@ class PoisonProcess(object):
 		compressed_files = []
 		kfs = False
 		renamer_type = None
-		
 		label_config = ConfigParser.ConfigParser()
 		
 		if not label == '':
@@ -67,7 +66,6 @@ class PoisonProcess(object):
 			for ext in keep_ext:
 				print '\t\t\t\t' + ext
 			print ''
-			
 		# Sort files into lists depending on file extension
 		for f in files:
 			if not any(word in f for word in ignore_words):
@@ -157,14 +155,14 @@ class PoisonProcess(object):
 
 	def notify(self, email_info, pb_info, notification_info):
 		if email_info['enable']:
-			em = Email()
+			em = email.Email()
 			if em.send_email(email_info, notification_info):
 				print 'notification emailed!'
 			else:
 				print 'could not email notification'
 
 		if pb_info['enable']:
-			pb = Pushbullet()
+			pb = pbullet.Pushbullet()
 			if pb.push(pb_info['token'], notification_info):
 				print 'notification pushed!'
 			else:
@@ -185,7 +183,7 @@ class PoisonProcess(object):
 		
 		self.useRenamer = self.config.getboolean("theRenamer", "enable")
 
-		self.ignore_words = (config.get("Extensions", "ignore")).split('|')
+		self.ignore_words = (self.config.get("Extensions", "ignore")).split('|')
 
 		self.notifyOnAdd = self.config.getboolean("General", "notify")
 		self.notifyOnRem = self.config.getboolean("General", "notifyRemove")
@@ -200,7 +198,7 @@ class PoisonProcess(object):
 		}
 		self.pb_info = {
 				'enable': self.config.getboolean("PushBullet", "enable"),
-				'token': self.config.getboolean("PushBullet", "token"),
+				'token': self.config.get("PushBullet", "token"),
 		}
 
 		self.webui_port = self.config.get("Client", "port")
@@ -223,12 +221,12 @@ class PoisonProcess(object):
 			if torrent_prev == 'downloading' and (torrent_state == 'seeding' or torrent_state == 'moving'):
 
 				# get what files to keep and what to extract
-				self.keep_files, self.compressed_files,
-				self.keep_structure, self.keep_ext, self.renamer_type = self.filter_files(self.config,
-																							 this_dir, 
-																							 self.torrent_info['files'], 
-																							 self.torrent_info['label'])
-
+				self.keep_files = []
+				self.compressed_files = []
+				self.keep_files, self.compressed_files, self.keep_structure, self.keep_ext, self.renamer_type = self.filter_files(self.config,
+																							 										this_dir, 
+																							 										self.torrent_info['files'], 
+																							 										self.torrent_info['label'])
 				if self.keep_structure and torrent_kind == 'multi':
 					self.destination = os.path.normpath(os.path.join(self.output_dir,
 																self.torrent_info['label'] if self.append_label else '',
@@ -288,7 +286,7 @@ class PoisonProcess(object):
 				self.action = 'removed'
 
 			# notifiy user
-			if action != None and\
+			if self.action != None and\
 			 ( (self.action == 'added' and self.notifyOnAdd) or\
 			  (self.action == 'removed' and self.notifyOnRem) ):
 				self.notification_info = {
@@ -298,6 +296,6 @@ class PoisonProcess(object):
 						'time': time.strftime("%I:%M:%S%p"),
 						'action': self.action,
 				}
-				self.notify(email_info, pb_info, notification_info)
+				self.notify(self.email_info, self.pb_info, self.notification_info)
 		else:
 			print 'could not get torrent info'

@@ -1,6 +1,6 @@
 import json
 
-from .. import requests
+from ... import requests
 
 class Device(object):
 

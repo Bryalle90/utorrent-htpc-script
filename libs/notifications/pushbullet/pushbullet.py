@@ -1,6 +1,6 @@
 from itertools import chain
 
-from .. import requests
+from ... import requests
 import sys
 from .device import Device
 
