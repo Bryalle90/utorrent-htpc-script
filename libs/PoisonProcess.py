@@ -1,19 +1,23 @@
 import os
 import sys
+import time
 import errno
 import shutil
 import binascii
 import subprocess
 import ConfigParser
 import libs.client.utorrent as TorClient
+
 from libs.unrar2 import RarFile
-from libs.notifications import email
+from libs.notifications.email import Email
+from libs.notifications.pushbullet import Pushbullet
 
 class PoisonProcess(object):
 	def __init__(self):
 		pass
 
-	def filter_files(self, config, main_dir, files, label):	# returns a list of files to keep in destination and a list of files to extract and whether or not to keep the folder structure
+	# returns a list of files to keep in destination and a list of files to extract and whether or not to keep the folder structure
+	def filter_files(self, config, main_dir, files, label):	
 		ignore_words = (config.get("Extensions", "ignore")).split('|')
 		archive_ext = tuple((config.get("Extensions", "compressed")).split('|'))
 		keep_ext = []
@@ -75,8 +79,9 @@ class PoisonProcess(object):
 						compressed_files.append(f)
 
 		return keep_files, compressed_files, kfs, keep_ext, renamer_type
-		
-	def is_mainRar(self, file):	# returns true if file is the main rar file in a rar set or just a single rar
+
+	# returns true if file is the main rar file in a rar set or just a single rar
+	def is_mainRar(self, file):	
 		with open(file, "rb") as file:
 			byte = file.read(12)
 
@@ -89,8 +94,9 @@ class PoisonProcess(object):
 			return True
 
 		return False
-			
-	def make_directories(self, directory):	# creates a directory if it doesn't already exist
+
+	# creates a directory if it doesn't already exist
+	def make_directories(self, directory):	
 		if not os.path.exists(directory):
 			try:
 				os.makedirs(directory)
@@ -99,7 +105,8 @@ class PoisonProcess(object):
 					raise
 				pass
 
-	def copy_file(self, source_file, destination):	# copies a file to a destination folder, returns success
+	# copies a file to a destination folder, returns success
+	def copy_file(self, source_file, destination):	
 		file_name = os.path.split(source_file)[1]
 		destination_file = os.path.join(destination, file_name)
 		if not os.path.isfile(destination_file):
@@ -111,7 +118,8 @@ class PoisonProcess(object):
 		else:
 			print file_name + ' already exists in destination - skipping'
 
-	def copy_tree(self, source, dest, keep_ext):	# copies a folder structure to destination and only files with the specified extensions
+	# copies a folder structure to destination and only files with the specified extensions
+	def copy_tree(self, source, dest, keep_ext):	
 		for dirName, subdirList, fileList in os.walk(source):
 			for fname in fileList:
 				if fname.endswith(keep_ext):
@@ -120,8 +128,9 @@ class PoisonProcess(object):
 					newPath = os.path.normpath(os.path.join(dest, os.path.split(relPath)[0]))
 					self.make_directories(newPath)
 					self.copy_file(full_file, newPath)
-						
-	def extract_file(self, source_file, destination):	# extracts files from source rar to destination directory
+
+	# extracts files from source rar to destination directory
+	def extract_file(self, source_file, destination):	
 		try:
 			rar_handle = RarFile(source_file)
 			for rar_file in rar_handle.infolist():
@@ -135,7 +144,8 @@ class PoisonProcess(object):
 		except Exception, e:
 			print "Failed to extract " + os.path.split(source_file)[1] + ": " + e + " " + traceback.format_exc()
 
-	def clean_dest(self, dest, keep_ext, ignore_words): # cleans the destination of all files that done end with extensions in keep_ext
+	# cleans the destination of all files that done end with extensions in keep_ext
+	def clean_dest(self, dest, keep_ext, ignore_words): 
 		for dirName, subdirList, fileList in os.walk(dest):
 			for fname in fileList:
 				if not fname.endswith(keep_ext) or any(word in fname for word in ignore_words):
@@ -144,6 +154,21 @@ class PoisonProcess(object):
 		for dirName, subdirList, fileList in os.walk(dest, topdown=False):
 			if len(fileList) == 0 and len(subdirList) == 0:
 				os.rmdir(dirName)
+
+	def notify(self, email_info, pb_info, notification_info):
+		if email_info['enable']:
+			em = Email()
+			if em.send_email(email_info, notification_info):
+				print 'notification emailed!'
+			else:
+				print 'could not email notification'
+
+		if pb_info['enable']:
+			pb = Pushbullet()
+			if pb.push(pb_info['token'], notification_info):
+				print 'notification pushed!'
+			else:
+				print 'could not push notification'
 	
 	def process_torrent(self, this_dir, configFilename, torrent_hash, torrent_kind, torrent_prev, torrent_state):
 		self.config = ConfigParser.ConfigParser()
@@ -158,16 +183,25 @@ class PoisonProcess(object):
 		self.append_torName = self.config.getboolean("General", "appendTorrentName")
 		self.deleteOnFinish = self.config.getboolean("General", "remove")
 		
-		self.useRenamer = self.config.getboolean("Renamer", "useTheRenamer")
+		self.useRenamer = self.config.getboolean("theRenamer", "enable")
 
 		self.ignore_words = (config.get("Extensions", "ignore")).split('|')
-		
-		self.email_notify = self.config.getboolean("Notifications", "email")
-		self.email_server = self.config.get("Notifications", "SMTPServer")
-		self.email_port = self.config.get("Notifications", "SMTPPort")
-		self.email_user = self.config.get("Notifications", "username")
-		self.email_pass = self.config.get("Notifications", "password")
-		self.email_to = self.config.get("Notifications", "emailTo")
+
+		self.notifyOnAdd = self.config.getboolean("General", "notify")
+		self.notifyOnRem = self.config.getboolean("General", "notifyRemove")
+
+		self.email_info = {
+				'enable': self.config.getboolean("Email", "enable"),
+				'server': self.config.get("Email", "SMTPServer"),
+				'port': self.config.get("Email", "SMTPPort"),
+				'user': self.config.get("Email", "username"),
+				'pass': self.config.get("Email", "password"),
+				'to': self.config.get("Email", "emailTo"),
+		}
+		self.pb_info = {
+				'enable': self.config.getboolean("PushBullet", "enable"),
+				'token': self.config.getboolean("PushBullet", "token"),
+		}
 
 		self.webui_port = self.config.get("Client", "port")
 		self.webui_URL = 'http://localhost:' + str(self.webui_port) + '/gui/'
@@ -184,11 +218,16 @@ class PoisonProcess(object):
 
 		if self.torrent_info:
 
+			self.action = None
 			# if torrent goes from downloading -> seeding, copy and extract files
 			if torrent_prev == 'downloading' and (torrent_state == 'seeding' or torrent_state == 'moving'):
 
 				# get what files to keep and what to extract
-				self.keep_files, self.compressed_files, self.keep_structure, self.keep_ext, self.renamer_type = self.filter_files(self.config, this_dir, self.torrent_info['files'], self.torrent_info['label'])
+				self.keep_files, self.compressed_files,
+				self.keep_structure, self.keep_ext, self.renamer_type = self.filter_files(self.config,
+																							 this_dir, 
+																							 self.torrent_info['files'], 
+																							 self.torrent_info['label'])
 
 				if self.keep_structure and torrent_kind == 'multi':
 					self.destination = os.path.normpath(os.path.join(self.output_dir,
@@ -228,7 +267,7 @@ class PoisonProcess(object):
 
 				if self.useRenamer and not self.renamer_type == None:
 					print 'Renaming files with theRenamer'
-					self.renamer_path = self.config.get("Renamer", "renamerPath")
+					self.renamer_path = self.config.get("theRenamer", "renamerPath")
 					self.renamer_path = os.path.join(self.renamer_path, 'theRenamer.exe')
 					try:
 						subprocess.call([self.renamer_path, self.renamer_type])
@@ -236,11 +275,29 @@ class PoisonProcess(object):
 					except Exception, e:
 						print 'could not call renamer' + e
 
-				
+				self.action = 'added'
 
 			# if torrent goes from seeding -> finished and has a label config file, remove torrent from list
-			elif torrent_prev == 'seeding' and torrent_state == 'finished' and self.deleteOnFinish and if os.path.exists(os.path.join(this_dir, 'labels', self.torrent_info['label']) + '.cfg'):
+			elif torrent_prev == 'seeding' and \
+				torrent_state == 'finished' and \
+				self.deleteOnFinish and \
+				os.path.exists(os.path.join(this_dir, 'labels', self.torrent_info['label']) + '.cfg'):
+				
 				print 'Removing torrent: ' + self.torrent_info['name']
 				uTorrent.delete_torrent(self.torrent)
+				self.action = 'removed'
+
+			# notifiy user
+			if action != None and\
+			 ( (self.action == 'added' and self.notifyOnAdd) or\
+			  (self.action == 'removed' and self.notifyOnRem) ):
+				self.notification_info = {
+						'title': self.torrent_info['name'],
+						'label': self.torrent_info['label'],
+						'date': time.strftime("%m/%d/%Y"),
+						'time': time.strftime("%I:%M:%S%p"),
+						'action': self.action,
+				}
+				self.notify(email_info, pb_info, notification_info)
 		else:
 			print 'could not get torrent info'
