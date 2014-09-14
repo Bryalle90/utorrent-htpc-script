@@ -23,8 +23,8 @@ class PoisonProcess(object):
 		keep_ext = []
 		keep_files = []
 		compressed_files = []
+		filebot_info = []
 		kfs = False
-		renamer_type = None
 		label_config = ConfigParser.ConfigParser()
 		
 		if os.path.exists(os.path.join(main_dir, 'labels', label) + '.cfg'):
@@ -44,13 +44,11 @@ class PoisonProcess(object):
 			
 			kfs = label_config.getboolean("Folders", "keepFolderStructure")
 
-			renamer_type = label_config.get("Renamer", "renamerType")
-			if renamer_type == 'movie':
-				renamer_type = '-fetchmovie'
-			elif renamer_type == 'tv':
-				renamer_type = '-fetch'
-			else:
-				renamer_type = None
+			filebot_info = {
+				'enable': label_config.get("Filebot", "enable"),
+				'path': label_config.get("Filebot", "path"),
+				'format': label_config.get("Filebot", "format"),
+			}
 
 			print 'Successfully read ' + label + ' config file' + '\n'
 		else:
@@ -75,7 +73,7 @@ class PoisonProcess(object):
 					if f.endswith('.rar') and self.is_mainRar(f):	# This will ignore rar sets where all (rar) files end with .rar
 						compressed_files.append(f)
 
-		return keep_files, compressed_files, kfs, keep_ext, renamer_type
+		return keep_files, compressed_files, kfs, keep_ext, filebot_info
 
 	# returns true if file is the main rar file in a rar set or just a single rar
 	def is_mainRar(self, file):	
@@ -152,6 +150,10 @@ class PoisonProcess(object):
 			if len(fileList) == 0 and len(subdirList) == 0:
 				os.rmdir(dirName)
 
+	def rename_move(self, source, dest, format):
+		subprocess.call(['filebot', '-rename', self.source, '--output', self.dest, '--format', format])
+		os.rmdir(source)
+
 	def notify(self, email_info, pb_info, notification_info):
 		if email_info['enable']:
 			em = email.Email()
@@ -177,7 +179,6 @@ class PoisonProcess(object):
 			exit(-1)
 		self.output_dir = self.config.get("General", "outputDirectory")
 		self.append_label = self.config.getboolean("General", "appendLabel")
-		self.append_torName = self.config.getboolean("General", "appendTorrentName")
 		self.deleteOnFinish = self.config.getboolean("General", "remove")
 		
 		self.useRenamer = self.config.getboolean("theRenamer", "enable")
@@ -228,7 +229,7 @@ class PoisonProcess(object):
 				# get what files to keep and what to extract
 				self.keep_files = []
 				self.compressed_files = []
-				self.keep_files, self.compressed_files, self.keep_structure, self.keep_ext, self.renamer_type = self.filter_files(self.config,
+				self.keep_files, self.compressed_files, self.keep_structure, self.keep_ext, self.filebot = self.filter_files(self.config,
 																							 										this_dir, 
 																							 										self.torrent_info['files'], 
 																							 										self.torrent_info['label'])
@@ -245,7 +246,7 @@ class PoisonProcess(object):
 					# create destination if it doesn't exist
 					self.destination = os.path.normpath(os.path.join(self.output_dir,
 																self.torrent_info['label'] if self.append_label else '',
-																self.torrent_info['name'] if self.append_torName else ''))
+																self.torrent_info['name']))
 					self.make_directories(self.destination)
 					print 'Copying files from: ' + self.torrent_info['folder']
 					print 'to: ' + self.destination
@@ -268,17 +269,8 @@ class PoisonProcess(object):
 				self.clean_dest(self.destination, self.keep_ext, self.ignore_words)
 				print '--\n'
 
-				if self.useRenamer and not self.renamer_type == None:
-					print 'Renaming files with theRenamer'
-					self.renamer_path = self.config.get("theRenamer", "renamerPath")
-					self.renamer_path = os.path.join(self.renamer_path, 'theRenamer.exe')
-					try:
-						subprocess.call([self.renamer_path, self.renamer_type])
-						print 'Files renamed!\n'
-					except Exception, e:
-						print 'could not call renamer' + e
-
-				self.action = 'added'
+				if filebot['enable']:
+					self.rename_move(self.destination, self.filebot['path'], self.filebot['format'])
 
 			# if torrent goes from seeding -> finished and has a label config file, remove torrent from list
 			elif torrent_prev == 'seeding' and \
