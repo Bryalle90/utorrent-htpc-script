@@ -20,10 +20,9 @@ class Pushbullet():
 				'time: ' + notification_info['time'] + '\n' +\
 				'action: ' + notification_info['action']
 
-		for d in pbDevices:
-			try:
-				d.push_note(title, body)
-			except Exception, e:
-				print e
-				return False
+		try:
+			pbDevices[0].push_note(title, body)
+		except Exception, e:
+			print e
+			return False
 		return True
