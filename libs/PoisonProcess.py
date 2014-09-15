@@ -151,8 +151,8 @@ class PoisonProcess(object):
 				os.rmdir(dirName)
 
 	def rename_move(self, source, dest, format):
-		subprocess.call(['filebot', '-rename', self.source, '--output', self.dest, '--format', format])
-		os.rmdir(source)
+		subprocess.call(['filebot', '-rename', source, '--output', dest, '--format', format, '-non-strict'])
+		shutil.rmtree(source, ignore_errors=True)
 
 	def notify(self, email_info, pb_info, notification_info):
 		if email_info['enable']:
@@ -180,8 +180,6 @@ class PoisonProcess(object):
 		self.output_dir = self.config.get("General", "outputDirectory")
 		self.append_label = self.config.getboolean("General", "appendLabel")
 		self.deleteOnFinish = self.config.getboolean("General", "remove")
-		
-		self.useRenamer = self.config.getboolean("theRenamer", "enable")
 
 		self.ignore_words = (self.config.get("Extensions", "ignore")).split('|')
 
@@ -269,9 +267,10 @@ class PoisonProcess(object):
 				self.clean_dest(self.destination, self.keep_ext, self.ignore_words)
 				print '--\n'
 
-				if filebot['enable']:
+				if self.filebot['enable']:
 					self.rename_move(self.destination, self.filebot['path'], self.filebot['format'])
 
+				self.action = 'added'
 			# if torrent goes from seeding -> finished and has a label config file, remove torrent from list
 			elif torrent_prev == 'seeding' and \
 				torrent_state == 'finished' and \

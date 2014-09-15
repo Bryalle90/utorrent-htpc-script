@@ -52,4 +52,6 @@ if len(torrent_hash) == 40:
 		print e
 else:
 	print 'Script only compatible with uTorrent 3.0+'
+
+# raw_input("Press Enter to continue...")
 exit(0)
