@@ -1,7 +1,7 @@
 # README #
 
-version: 0.2
-date: June 15, 2014
+version: 0.3
+date: Sept 14, 2014
 
 ## Program Requirements ##
 
@@ -12,7 +12,7 @@ date: June 15, 2014
 
 ### Optional ###
 
-* theRenamer
+* FileBot
 
 ## How do I get set up? ##
 
@@ -24,9 +24,9 @@ date: June 15, 2014
   script to finish extracting and moving files before removing the torrent
   from uTorrent, if enabled
 
-### theRenamer ###
+### FileBot ###
 
-* set up theRenamer source folders to the output folder in the config
+* you must set up label configs in order to use filebot to rename files
 
 ## TODO ##
 
@@ -34,5 +34,6 @@ date: June 15, 2014
 * Finish extracting file to destination - Done
 * Delete unwanted items in destination folder - Done
 * Edit the remove torrent script ( should be easy ) - Done
-* Implement theRenamer or couchpotato/sickbeard postprocess scripts - Done
+* Implement theRenamer or couchpotato/sickbeard postprocess scripts - Done (filebot)
 * Implement notifications - Done (email, pushbullet)
+* Update the pushbullet library
