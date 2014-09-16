@@ -7,11 +7,7 @@ torrent_kind = sys.argv[2]  # Kind of the torrent, %K
 torrent_prev = sys.argv[3]  # Kind of the torrent, %P
 torrent_state = sys.argv[4]  # Kind of the torrent, %S
 
-if int(torrent_state) == 4 or\
-	 int(torrent_state) == 5 or\
-	 int(torrent_state) == 7 or\
-	 int(torrent_state) == 8 or\
-	 int(torrent_state) == 10:
+if int(torrent_state) == 4 or int(torrent_state) == 5 or int(torrent_state) == 7 or int(torrent_state) == 8 or int(torrent_state) == 10:
 	torrent_state = 'seeding'
 elif int(torrent_state) == 6 or int(torrent_state) == 9:
 	torrent_state = 'downloading'
@@ -19,12 +15,10 @@ elif int(torrent_state) == 20:
 	torrent_state = 'moving'
 elif int(torrent_state) == 11:
 	torrent_state = 'finished'
+elif int(torrent_state) == 3:
+	torrent_state = 'paused'
 
-if int(torrent_prev) == 4 or\
-	 int(torrent_prev) == 5 or\
-	 int(torrent_prev) == 7 or\
-	 int(torrent_prev) == 8 or\
-	 int(torrent_prev) == 10:
+if int(torrent_prev) == 4 or int(torrent_prev) == 5 or int(torrent_prev) == 7 or int(torrent_prev) == 8 or int(torrent_prev) == 10:
 	torrent_prev = 'seeding'
 elif int(torrent_prev) == 6 or int(torrent_prev) == 9:
 	torrent_prev = 'downloading'
@@ -32,6 +26,8 @@ elif int(torrent_prev) == 20:
 	torrent_prev = 'moving'
 elif int(torrent_prev) == 11:
 	torrent_prev = 'finished'
+elif int(torrent_prev) == 3:
+	torrent_prev = 'paused'
 
 print 'torrent hash:    ' + torrent_hash
 print 'previous state:  ' + torrent_prev
