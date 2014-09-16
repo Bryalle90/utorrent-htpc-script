@@ -17,7 +17,7 @@ class PoisonProcess(object):
 		pass
 
 	# returns a list of files to keep in destination and a list of files to extract and whether or not to keep the folder structure
-	def filter_files(self, config, main_dir, files, label):	
+	def filter_files(self, config, main_dir, files, label):
 		ignore_words = (config.get("Extensions", "ignore")).split('|')
 		archive_ext = tuple((config.get("Extensions", "compressed")).split('|'))
 		keep_ext = []
@@ -26,7 +26,7 @@ class PoisonProcess(object):
 		filebot_info = []
 		kfs = False
 		label_config = ConfigParser.ConfigParser()
-		
+
 		if os.path.exists(os.path.join(main_dir, 'labels', label) + '.cfg'):
 			label_file = os.path.normpath(os.path.join(main_dir, 'labels', label) + '.cfg')
 			label_config.read(label_file)
@@ -41,11 +41,12 @@ class PoisonProcess(object):
 				keep_ext.extend(config.get("Extensions", "subtitle").split('|'))
 			if label_config.getboolean("Type", "readme"):
 				keep_ext.extend(config.get("Extensions", "readme").split('|'))
-			
+
 			kfs = label_config.getboolean("Folders", "keepFolderStructure")
 
 			filebot_info = {
 				'enable': label_config.get("Filebot", "enable"),
+				'db': label_config.get("Filebot", "database"),
 				'path': label_config.get("Filebot", "path"),
 				'format': label_config.get("Filebot", "format"),
 			}
@@ -76,7 +77,7 @@ class PoisonProcess(object):
 		return keep_files, compressed_files, kfs, keep_ext, filebot_info
 
 	# returns true if file is the main rar file in a rar set or just a single rar
-	def is_mainRar(self, file):	
+	def is_mainRar(self, file):
 		with open(file, "rb") as file:
 			byte = file.read(12)
 
@@ -91,7 +92,7 @@ class PoisonProcess(object):
 		return False
 
 	# creates a directory if it doesn't already exist
-	def make_directories(self, directory):	
+	def make_directories(self, directory):
 		if not os.path.exists(directory):
 			try:
 				os.makedirs(directory)
@@ -101,7 +102,7 @@ class PoisonProcess(object):
 				pass
 
 	# copies a file to a destination folder, returns success
-	def copy_file(self, source_file, destination):	
+	def copy_file(self, source_file, destination):
 		file_name = os.path.split(source_file)[1]
 		destination_file = os.path.join(destination, file_name)
 		if not os.path.isfile(destination_file):
@@ -114,7 +115,7 @@ class PoisonProcess(object):
 			print file_name + ' already exists in destination - skipping'
 
 	# copies a folder structure to destination and only files with the specified extensions
-	def copy_tree(self, source, dest, keep_ext):	
+	def copy_tree(self, source, dest, keep_ext):
 		for dirName, subdirList, fileList in os.walk(source):
 			for fname in fileList:
 				if fname.endswith(keep_ext):
@@ -125,7 +126,7 @@ class PoisonProcess(object):
 					self.copy_file(full_file, newPath)
 
 	# extracts files from source rar to destination directory
-	def extract_file(self, source_file, destination):	
+	def extract_file(self, source_file, destination):
 		try:
 			rar_handle = RarFile(source_file)
 			for rar_file in rar_handle.infolist():
@@ -135,23 +136,38 @@ class PoisonProcess(object):
 				else:
 					rar_handle.extract(condition=[rar_file.index], path=destination, withSubpath=True, overwrite=False)
 			del rar_handle
-			print "Successfully extracted " + os.path.split(source_file)[1] + " to destination"
+			print "Successfully extracted " + os.path.split(source_file)[1]
 		except Exception, e:
-			print "Failed to extract " + os.path.split(source_file)[1] + ": " + e + " " + traceback.format_exc()
+			print "Failed to extract " + os.path.split(source_file)[1] + ": " + str(e)
 
 	# cleans the destination of all files that done end with extensions in keep_ext
-	def clean_dest(self, dest, keep_ext, ignore_words): 
+	def clean_dest(self, dest, keep_ext, ignore_words):
 		for dirName, subdirList, fileList in os.walk(dest):
 			for fname in fileList:
 				if not fname.endswith(keep_ext) or any(word in fname for word in ignore_words):
 					print 'deleting: ' + fname
-					os.remove(os.path.normpath(os.path.join(dirName, fname)))
+					try:
+						os.remove(os.path.normpath(os.path.join(dirName, fname)))
+					except Exception, e:
+						print 'could not delete ' + fname + ': ' + str(e)
 		for dirName, subdirList, fileList in os.walk(dest, topdown=False):
 			if len(fileList) == 0 and len(subdirList) == 0:
 				os.rmdir(dirName)
 
-	def rename_move(self, source, dest, format):
-		subprocess.call(['filebot', '-rename', source, '--output', dest, '--format', format, '-non-strict'])
+	def rename_move(self, install_path, source, dest, db, format):
+		self.fb_path = os.path.join(install_path, 'filebot.exe')
+		try:
+			fb_args = [
+				self.fb_path,
+				'-rename', source,
+				'--output', dest,
+				'--db', db,
+				'--format', format,
+				'-non-strict'
+			]
+			subprocess.call(fb_args)
+		except Exception, e:
+			print 'could not rename file:', str(e)
 		shutil.rmtree(source, ignore_errors=True)
 
 	def notify(self, email_info, pb_info, notification_info):
@@ -165,10 +181,10 @@ class PoisonProcess(object):
 		if pb_info['enable']:
 			pb = pbullet.Pushbullet()
 			if pb.push(pb_info['token'], notification_info):
-				print 'notification pushed!'
+				print 'notification pushed via PushBullet!'
 			else:
 				print 'could not push notification'
-	
+
 	def process_torrent(self, this_dir, configFilename, torrent_hash, torrent_kind, torrent_prev, torrent_state):
 		self.config = ConfigParser.ConfigParser()
 		try:
@@ -187,17 +203,19 @@ class PoisonProcess(object):
 		self.notifyOnRem = self.config.getboolean("General", "notifyRemove")
 
 		self.email_info = {
-				'enable': self.config.getboolean("Email", "enable"),
-				'server': self.config.get("Email", "SMTPServer"),
-				'port': self.config.get("Email", "SMTPPort"),
-				'user': self.config.get("Email", "username"),
-				'pass': self.config.get("Email", "password"),
-				'to': self.config.get("Email", "emailTo"),
+			'enable': self.config.getboolean("Email", "enable"),
+			'server': self.config.get("Email", "SMTPServer"),
+			'port': self.config.get("Email", "SMTPPort"),
+			'user': self.config.get("Email", "username"),
+			'pass': self.config.get("Email", "password"),
+			'to': self.config.get("Email", "emailTo"),
 		}
 		self.pb_info = {
-				'enable': self.config.getboolean("PushBullet", "enable"),
-				'token': self.config.get("PushBullet", "token"),
+			'enable': self.config.getboolean("PushBullet", "enable"),
+			'token': self.config.get("PushBullet", "token"),
 		}
+
+		self.filebot_path = self.config.get("FileBot", "installDirectory")
 
 		self.webui_port = self.config.get("Client", "port")
 		self.webui_URL = 'http://localhost:' + str(self.webui_port) + '/gui/'
@@ -222,23 +240,20 @@ class PoisonProcess(object):
 
 			self.action = None
 			# if torrent goes from downloading -> seeding, copy and extract files
-			if torrent_prev == 'downloading' and (torrent_state == 'seeding' or torrent_state == 'moving'):
+			if (torrent_prev == 'downloading') and (torrent_state == 'seeding' or torrent_state == 'moving'):
 
 				# get what files to keep and what to extract
 				self.keep_files = []
 				self.compressed_files = []
-				self.keep_files, self.compressed_files, self.keep_structure, self.keep_ext, self.filebot = self.filter_files(self.config,
-																							 										this_dir, 
-																							 										self.torrent_info['files'], 
-																							 										self.torrent_info['label'])
+				self.keep_files, self.compressed_files, self.keep_structure, self.keep_ext, self.filebot = self.filter_files(self.config, this_dir, self.torrent_info['files'], self.torrent_info['label'])
 				if self.keep_structure and torrent_kind == 'multi':
 					self.destination = os.path.normpath(os.path.join(self.output_dir,
 																self.torrent_info['label'] if self.append_label else '',
 																self.torrent_info['name']))
-					print 'Copying files from: ' + self.torrent_info['folder']
-					print 'to: ' + self.destination
+					print 'Copying files from:\n\t' + self.torrent_info['folder']
+					print 'to:\n\t' + self.destination
 					print '--'
-					self.copy_tree(os.path.normpath(torrent_info['folder']), destination, self.keep_ext)
+					self.copy_tree(os.path.normpath(self.torrent_info['folder']), self.destination, self.keep_ext)
 					print '--\n'
 				else:
 					# create destination if it doesn't exist
@@ -246,45 +261,43 @@ class PoisonProcess(object):
 																self.torrent_info['label'] if self.append_label else '',
 																self.torrent_info['name']))
 					self.make_directories(self.destination)
-					print 'Copying files from: ' + self.torrent_info['folder']
-					print 'to: ' + self.destination
+					print 'Copying files from:\n\t' + self.torrent_info['folder']
+					print 'to:\n\t' + self.destination
 
 					# Loop through keep_files and copy the files
 					print '--'
 					for f in self.keep_files:
 						self.copy_file(f, self.destination)
 					print '--\n'
-					
+
 				# Loop through compressed_files and extract all files
-				print 'Extracting files to: ' + self.destination
+				print 'Extracting files to:\n\t' + self.destination
 				print '--'
 				for f in self.compressed_files:
 					self.extract_file(f, self.destination)
 				print '--\n'
 
-				print 'Cleaning up unwanted files in: ' + self.destination
+				print 'Cleaning up unwanted files in:\n\t' + self.destination
 				print '--'
 				self.clean_dest(self.destination, self.keep_ext, self.ignore_words)
 				print '--\n'
 
+				print 'Renaming and moving files from:\n\t' + self.destination
+				print '--'
 				if self.filebot['enable']:
-					self.rename_move(self.destination, self.filebot['path'], self.filebot['format'])
+					self.rename_move(self.filebot_path, self.destination, self.filebot['path'], self.filebot['db'], self.filebot['format'])
+				print '--\n'
 
 				self.action = 'added'
+
 			# if torrent goes from seeding -> finished and has a label config file, remove torrent from list
-			elif torrent_prev == 'seeding' and \
-				torrent_state == 'finished' and \
-				self.deleteOnFinish and \
-				os.path.exists(os.path.join(this_dir, 'labels', self.torrent_info['label']) + '.cfg'):
-				
-				print 'Removing torrent: ' + self.torrent_info['name']
+			elif torrent_prev == 'seeding' and torrent_state == 'finished' and self.deleteOnFinish and os.path.exists(os.path.join(this_dir, 'labels', self.torrent_info['label']) + '.cfg'):
+				print 'Removing torrent:\n\t' + self.torrent_info['name']
 				uTorrent.delete_torrent(self.torrent)
 				self.action = 'removed'
 
-			# notifiy user
-			if self.action != None and\
-			 ( (self.action == 'added' and self.notifyOnAdd) or\
-			  (self.action == 'removed' and self.notifyOnRem) ):
+			# notify user
+			if self.action != None and ( (self.action == 'added' and self.notifyOnAdd) or (self.action == 'removed' and self.notifyOnRem) ):
 				self.notification_info = {
 						'title': self.torrent_info['name'],
 						'label': self.torrent_info['label'],
@@ -292,6 +305,9 @@ class PoisonProcess(object):
 						'time': time.strftime("%I:%M:%S%p"),
 						'action': self.action,
 				}
+				print 'Notifying user'
+				print '--'
 				self.notify(self.email_info, self.pb_info, self.notification_info)
+				print '--\n'
 		else:
 			print 'label is blank - skipping'
