@@ -1,7 +1,7 @@
 # README #
 
-version: 0.3
-date: Sept 14, 2014
+version: 1.0
+date: Sept 16, 2014
 
 ## Program Requirements ##
 
@@ -23,8 +23,9 @@ date: Sept 14, 2014
 * it is recommended to at least keep seeding for a few mins to allow time for 
   script to finish extracting and moving files before removing the torrent
   from uTorrent, if enabled
+*
 
-### FileBot ###
+## FileBot ##
 
 * you must set up label configs in order to use filebot to rename files
 

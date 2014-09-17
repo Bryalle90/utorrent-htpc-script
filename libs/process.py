@@ -27,6 +27,7 @@ class PoisonProcess(object):
         self.output_dir = self.config.get("General", "outputDirectory")
         self.append_label = self.config.getboolean("General", "appendLabel")
         self.deleteOnFinish = self.config.getboolean("General", "remove")
+        self.skip_blank = self.config.getboolean("General", "ignoreBlankLabels")
 
         self.notifyOnAdd = self.config.getboolean("General", "notify")
         self.notifyOnRem = self.config.getboolean("General", "notifyRemove")
@@ -255,77 +256,76 @@ class PoisonProcess(object):
             print 'error getting torrent info: ' + str(e)
             exit(-1)
 
-        if torrent_info['label'] != 'skip':
+        if not (torrent_info['label'] == '' and self.skip_blank):
+            if torrent_info['label'] != 'skip':
 
-            action = None
-            # if torrent goes from downloading -> seeding, copy and extract files
-            if (torrent_prev == 'downloading') and (torrent_state == 'seeding' or torrent_state == 'moving'):
+                action = None
+                # if torrent goes from downloading -> seeding, copy and extract files
+                if (torrent_prev == 'downloading') and (torrent_state == 'seeding' or torrent_state == 'moving'):
 
-                # get what files to keep and what to extract
-                keep_structure, keep_ext, ignore_words, filebot = self.filter_files(torrent_info['files'], torrent_info['label'])
+                    # get what files to keep and what to extract
+                    keep_structure, keep_ext, ignore_words, filebot = self.filter_files(torrent_info['files'], torrent_info['label'])
 
-                if self.append_label:
-                    if torrent_info['label'] != '':
-                        torrent_label = torrent_info['label']
+                    if self.append_label:
+                        if torrent_info['label'] != '':
+                            torrent_label = torrent_info['label']
+                        else:
+                            torrent_label = 'blank'
                     else:
-                        torrent_label = 'blank'
-                else:
-                    torrent_label = ''
-                destination = os.path.normpath(os.path.join(self.output_dir, torrent_label, torrent_info['name']))
+                        torrent_label = ''
+                    destination = os.path.normpath(os.path.join(self.output_dir, torrent_label, torrent_info['name']))
 
-                print 'Copying files from:\n\t' + torrent_info['folder']
-                print 'to:\n\t' + destination
-                print '--'
-                if keep_structure and torrent_kind == 'multi':
-                    self.copy_tree(os.path.normpath(torrent_info['folder']), destination, keep_ext)
-                else:
-                    # create destination if it doesn't exist
-                    self.make_directories(destination)
-                    # Loop through keep_files and copy the files
-                    for f in self.keep_files:
-                        self.copy_file(f, destination)
-                print '--\n'
+                    print 'Copying files from:\n\t' + torrent_info['folder']
+                    print 'to:\n\t' + destination
+                    print '--'
+                    if keep_structure and torrent_kind == 'multi':
+                        self.copy_tree(os.path.normpath(torrent_info['folder']), destination, keep_ext)
+                    else:
+                        # create destination if it doesn't exist
+                        self.make_directories(destination)
+                        # Loop through keep_files and copy the files
+                        for f in self.keep_files:
+                            self.copy_file(f, destination)
+                    print '--\n'
 
-                # Loop through compressed_files and extract all files
-                print 'Extracting files to:\n\t' + destination
-                print '--'
-                for f in self.compressed_files:
-                    self.extract_file(f, destination)
-                print '--\n'
+                    # Loop through compressed_files and extract all files
+                    print 'Extracting files to:\n\t' + destination
+                    print '--'
+                    for f in self.compressed_files:
+                        self.extract_file(f, destination)
+                    print '--\n'
 
-                # clean files from destination that don't end with an extension in keep_ext
-                print 'Cleaning up unwanted files in:\n\t' + destination
-                print '--'
-                self.clean_path(destination, keep_ext, ignore_words)
-                print '--\n'
+                    # clean files from destination that don't end with an extension in keep_ext
+                    print 'Cleaning up unwanted files in:\n\t' + destination
+                    print '--'
+                    self.clean_path(destination, keep_ext, ignore_words)
+                    print '--\n'
 
-                # rename files and move them
-                print 'Renaming and moving files from:\n\t' + destination
-                print '--'
-                if filebot['enable']:
-                    self.rename_move(destination, filebot['path'], filebot['db'], filebot['format'])
-                print '--\n'
+                    # rename files and move them
+                    print 'Renaming and moving files from:\n\t' + destination
+                    print '--'
+                    if filebot['enable']:
+                        self.rename_move(destination, filebot['path'], filebot['db'], filebot['format'])
+                    print '--\n'
 
-                action = 'added'
+                    action = 'added'
 
-            # if torrent goes from seeding -> finished and has a label config file, remove torrent from list
-            elif torrent_prev == 'seeding' and torrent_state == 'finished' and self.deleteOnFinish and os.path.exists(os.path.join(self.this_dir, 'labels', torrent_info['label']) + '.cfg'):
-                print 'Removing torrent:\n\t' + torrent_info['name']
-                self.uTorrent.delete_torrent(torrent)
-                action = 'removed'
+                # if torrent goes from seeding -> finished and has a label config file, remove torrent from list
+                elif torrent_prev == 'seeding' and torrent_state == 'finished' and self.deleteOnFinish and os.path.exists(os.path.join(self.this_dir, 'labels', torrent_info['label']) + '.cfg'):
+                    print 'Removing torrent:\n\t' + torrent_info['name']
+                    self.uTorrent.delete_torrent(torrent)
+                    action = 'removed'
 
-            # notify user
-            if action is not None and ((action == 'added' and self.notifyOnAdd) or (action == 'removed' and self.notifyOnRem)):
-                notification_info = {
-                    'title': torrent_info['name'],
-                    'label': torrent_info['label'],
-                    'date': time.strftime("%m/%d/%Y"),
-                    'time': time.strftime("%I:%M:%S%p"),
-                    'action': action
-                }
-                print 'Notifying user'
-                print '--'
-                self.notify(self.email_info, self.pb_info, notification_info)
-                print '--\n'
-        else:
-            print 'label is blank - skipping'
+                # notify user
+                if action is not None and ((action == 'added' and self.notifyOnAdd) or (action == 'removed' and self.notifyOnRem)):
+                    notification_info = {
+                        'title': torrent_info['name'],
+                        'label': torrent_info['label'],
+                        'date': time.strftime("%m/%d/%Y"),
+                        'time': time.strftime("%I:%M:%S%p"),
+                        'action': action
+                    }
+                    print 'Notifying user'
+                    print '--'
+                    self.notify(self.email_info, self.pb_info, notification_info)
+                    print '--\n'
