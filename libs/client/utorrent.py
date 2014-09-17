@@ -59,10 +59,13 @@ class TorrentClient(object):
 
             torrent_info = {
                 'hash': torrent[0],
+                'status': torrent[1],
                 'name': torrent[2],
+                'size': torrent[3],
+                'progress': torrent[4],
                 'label': torrent[11] if torrent[11] else '',
-                'folder': torrent[26],
                 'state': torrent[21],
+                'folder': torrent[26],
                 'files': torrent_files,
             }
         except Exception:
