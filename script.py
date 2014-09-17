@@ -1,6 +1,6 @@
 import os
 import sys
-from libs.PoisonProcess import PoisonProcess
+from libs.process import PoisonProcess
 
 torrent_hash = sys.argv[1]  # Hash of the torrent, %I
 torrent_kind = sys.argv[2]  # Kind of the torrent, %K
@@ -41,9 +41,9 @@ if len(torrent_hash) == 32:
 	torrent_hash = b16encode(b32decode(torrent_hash))
 
 if len(torrent_hash) == 40:
-	pp = PoisonProcess()
+	pp = PoisonProcess(this_dir, configFilename)
 	try:
-		pp.process_torrent(this_dir, configFilename, torrent_hash, torrent_kind, torrent_prev, torrent_state)
+		pp.process_torrent(torrent_hash, torrent_kind, torrent_prev, torrent_state)
 	except Exception, e:
 		print e
 else:
